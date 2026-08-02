@@ -35,8 +35,8 @@ docs = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/yourusername/crimsons"
-Issues = "https://github.com/yourusername/crimsons/issues"
+Homepage = "https://github.com/lquerci/crimsons"
+Issues = "https://github.com/lquerci/crimsons/issues"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/crimsons"]
