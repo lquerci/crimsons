@@ -14,4 +14,5 @@ yields_data/
 # example/run artifacts
 /cache/
 *.h5
+*.csv
 !tests/**/*.h5
