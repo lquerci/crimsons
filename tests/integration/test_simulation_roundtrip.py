@@ -3,9 +3,9 @@ import numpy as np
 from crimsons import (
     PISN,
     EnrichmentResult,
-    StellarLifetime,
     Salpeter1955,
     Simulation,
+    StellarLifetime,
     default_channels,
 )
 

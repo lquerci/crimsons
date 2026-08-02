@@ -4,6 +4,7 @@ import hashlib
 import json
 from dataclasses import asdict, dataclass
 
+
 @dataclass(frozen=True)
 class RunConfig:
     """Everything needed to reproduce a Simulation run.

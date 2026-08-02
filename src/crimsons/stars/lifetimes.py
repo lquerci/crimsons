@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 
 import numpy as np
 
-from ..chemistry import ZSUN, POPIII_THRESHOLD
+from ..chemistry import POPIII_THRESHOLD, ZSUN
 
 
 class LifetimeFunction(ABC):

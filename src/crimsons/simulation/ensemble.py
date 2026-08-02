@@ -2,13 +2,13 @@ from __future__ import annotations
 
 import numpy as np
 
-from ..config import RunConfig
 from ..chemistry import ELEMENTS, ZSUN
+from ..config import RunConfig
 from ..enrichment.engine import bin_enrichment, run_realization
 from ..io.cache import cache_path, try_load_cache
 from ..results import EnrichmentResult
 from ..stars.lifetimes import StellarLifetime
-from ..yields.channels import default_channels 
+from ..yields.channels import default_channels
 
 
 class Simulation:

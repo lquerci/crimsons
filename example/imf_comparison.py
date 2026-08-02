@@ -1,12 +1,15 @@
 import matplotlib
+
 matplotlib.use('QtAgg')
 import matplotlib.pyplot as plt
 import numpy as np
 
-# Import your IMFs from the package
-from crimsons.imf.standard import FlatIMF, Salpeter1955, Kroupa2001
 #from crimsons.imf.numerical import NumericalIMF
 from crimsons.imf.functional import FunctionalIMF
+
+# Import your IMFs from the package
+from crimsons.imf.standard import FlatIMF, Kroupa2001, Salpeter1955
+
 
 def lognormal_func(m):
     mc = 0.079  # characteristic mass
@@ -35,7 +38,7 @@ imfs = {
 from scipy.integrate import quad
 
 for label, imf in imfs.items(): 
-    area, _ = quad(lambda m: imf.pdf(m)[0], m_min, m_max)
+    area, _ = quad(lambda m, imf=imf: imf.pdf(m)[0], m_min, m_max)
 
     print(f"{label} Area Integral: {area:.6f}") # Should print: 1.000000
 

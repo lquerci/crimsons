@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from crimsons.imf.standard import Kroupa2001, Salpeter1955, FlatIMF
+from crimsons.imf.standard import FlatIMF, Kroupa2001, Salpeter1955
 
 
 @pytest.mark.parametrize("imf_cls", [Salpeter1955, Kroupa2001, FlatIMF])

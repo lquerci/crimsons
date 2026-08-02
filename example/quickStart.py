@@ -5,10 +5,10 @@ Run with: python examples/quickstart.py
 import matplotlib.pyplot as plt
 import numpy as np
 
-from crimsons import Simulation, StellarLifetime, default_channels
-from crimsons.imf.functional import FunctionalIMF
+from crimsons import Simulation
 from crimsons.imf.standard import *
 from crimsons.yields.channels import *
+
 
 def lognormal_func(m):
     mc = 0.079  # characteristic mass

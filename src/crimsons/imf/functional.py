@@ -77,7 +77,7 @@ class FunctionalIMF(IMF):
                 result = np.asarray(self._shape(mass), dtype=float)
                 if result.shape == mass.shape:
                     return result
-            except Exception:
+            except Exception: # noqa: BLE001, S110 -- deliberate fallback for non-vectorized evaluation
                 pass
         except Exception:  # noqa: BLE001, S110 -- shape() is arbitrary user
             # code; any failure here just means "not vectorized", so we

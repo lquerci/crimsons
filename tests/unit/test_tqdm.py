@@ -1,12 +1,12 @@
 from unittest.mock import patch
-import pytest
+
 import numpy as np
+import pytest
 
 from crimsons import (
-    EnrichmentResult,
     Salpeter1955,
     Simulation,
-    )
+)
 
 
 def _make_simulation(**overrides):

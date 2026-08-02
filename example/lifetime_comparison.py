@@ -1,11 +1,12 @@
 import matplotlib
+
 matplotlib.use('QtAgg')
 import matplotlib.pyplot as plt
 import numpy as np
 
 # Load our LifetimeFunction models defined previously
 # (Assuming FortranLifetime and PowerLawLifetime are available in your code)
-from crimsons import  StellarLifetime
+from crimsons import StellarLifetime
 
 # 1. Instantiate the Lifetime models
 # Standard stellar mass range (0.08 to 500 M_sun to capture Pop III regimes)
