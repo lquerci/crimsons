@@ -1,0 +1,45 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "crimsons"
+version = "0.1.0"
+description = "Stochastic chemical enrichment of stellar populations (SNII, SNIa, AGB) from a sampled IMF."
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.10"
+authors = [{ name = "Lapo Querci", email = "lapo.querci@unifi.it" }]
+dependencies = [
+    "numpy>=1.24",
+    "scipy>=1.10",
+    "h5py>=3.8",
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Astronomy",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7.0", "ruff"]
+plot = ["matplotlib"]
+parallel = ["joblib"]
+verbose = ["tqdm"]
+docs = [
+    "mkdocs>=1.5",
+    "mkdocs-material>=9.5",
+    "mkdocstrings[python]>=0.24",
+]
+
+[project.urls]
+Homepage = "https://github.com/yourusername/crimsons"
+Issues = "https://github.com/yourusername/crimsons/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/crimsons"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

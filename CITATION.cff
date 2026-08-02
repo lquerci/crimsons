@@ -1,0 +1,11 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "crimsons: stochastic chemical enrichment of stellar populations"
+version: 0.1.0
+date-released: 2026-07-31
+authors:
+  - family-names: "Your Last Name"
+    given-names: "Your First Name"
+    affiliation: "Your Institution"
+repository-code: "https://github.com/yourusername/crimsons"
+license: MIT

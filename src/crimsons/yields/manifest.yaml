@@ -1,0 +1,20 @@
+# Registry of bundled yield tables.
+#
+# This file is documentation, not (yet) loaded by code -- it exists so
+# that adding/updating a real literature table later is a data change
+# plus one line here, not a code change. Extend `yields/channels.py` to
+# read from here once you have more than a couple of named tables.
+
+# Registry of bundled CSV yield tables that aren't self-describing.
+#
+# SNII/AGB/PISN live in stellar_yields.h5 instead, which carries its own
+# metadata natively (each model group's "axes" attribute + grid
+# datasets) -- introspect it with
+# crimsons.yields.channels.list_available_models /
+# describe_available_model rather than a manifest entry here.
+
+- id: snia_placeholder
+  file: snia_placeholder.csv
+  channel: SNIa
+  citation: null  # PLACEHOLDER -- synthetic data, not from a real paper
+  metallicities: [0.0, 0.02]
