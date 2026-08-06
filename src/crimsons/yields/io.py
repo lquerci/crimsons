@@ -1,10 +1,12 @@
+from __future__ import annotations
+
 import csv
 from pathlib import Path
 
 import h5py
 import numpy as np
 
-from .base import YieldTable
+from .base import StochasticYieldTable, YieldTable, _is_distribution
 
 
 def load_yield_table(csv_path) -> YieldTable:
@@ -83,23 +85,34 @@ def describe_model(h5_path, channel: str, model: str) -> dict:
         return info
 
 
-def load_yield_table_hdf5(h5_path, channel: str, model: str, model_params: dict | None = None) -> YieldTable:
+def load_yield_table_hdf5(h5_path, channel: str, model: str, model_params: dict | None = None):
     """Load one model's yield table from a stellar-yields HDF5 file,
     resolving any extra parameter axes (e.g. HW's energy/mixing, LC's
-    rotation) to a fixed slice.
+    rotation).
 
     Every model has "metallicity", "mass", and "elements" axes. Any
-    additional axes are discrete model variants -- if an axis has more
-    than one grid value, you must say which one to use via model_params
-    (e.g. {"rotation": 300} or {"energy": 1.2, "mixing": 0.02}); axes
-    with only one grid value are picked automatically, no need to specify
-    them. The chosen value is snapped to the nearest available grid
-    point, not interpolated across -- these are separate model
-    calculations, not a smoothly varying physical dimension the engine
-    has any way to assign per star.
+    additional axes are discrete model variants. For each one, a
+    model_params entry can be either:
 
-    Raises a ValueError naming the axis and its available values if a
-    required model_params entry is missing.
+      - a fixed value (e.g. {"rotation": 300}) -- resolved once, the
+        same for every star, snapped to the nearest tabulated grid
+        point; or
+      - a distribution to draw from per star (e.g.
+        {"rotation": scipy.stats.norm(loc=200, scale=50)}, or any plain
+        callable(rng, n) -> array of n draws) -- each star gets its own
+        independent draw, again snapped to the nearest grid point. This
+        returns a StochasticYieldTable in that case, which needs an rng
+        at call time (Channel.yields provides one automatically).
+
+    An axis with only one grid value is picked automatically either way
+    -- no model_params entry needed. A ValueError names the axis and its
+    available values if a required (multi-valued, unspecified) axis is
+    missing from model_params.
+
+    Snapping to the nearest value (rather than interpolating) applies
+    here regardless of fixed-or-distribution: these are separate model
+    calculations (different literature sources' physics), not a smoothly
+    varying physical dimension.
     """
     model_params = dict(model_params or {})
     h5_path = Path(h5_path)
@@ -115,9 +128,13 @@ def load_yield_table_hdf5(h5_path, channel: str, model: str, model_params: dict 
             raise ValueError(f"{channel}/{model} is missing a required '{required}' axis; has {axes}")
 
     extra_axes = [a for a in axes if a not in ("metallicity", "mass", "elements")]
+    pdf_axes = [a for a in extra_axes if _is_distribution(model_params.get(a))]
+    fixed_axes = [a for a in extra_axes if a not in pdf_axes]
+
+    # resolve FIXED axes first: collapse them out of yields_nd immediately
     slicer = [slice(None)] * yields_nd.ndim
-    chosen = {}
-    for axis in extra_axes:
+    chosen_fixed = {}
+    for axis in fixed_axes:
         values = np.asarray(grids[axis], dtype=float)
         if len(values) == 1:
             idx = 0
@@ -126,25 +143,49 @@ def load_yield_table_hdf5(h5_path, channel: str, model: str, model_params: dict 
         else:
             raise ValueError(
                 f"{channel}/{model} has {len(values)} possible '{axis}' values "
-                f"{values.tolist()} -- pass model_params={{'{axis}': <value>}} to pick one"
+                f"{values.tolist()} -- pass model_params={{'{axis}': <value or distribution>}} to pick one"
             )
         slicer[axes.index(axis)] = idx
-        chosen[axis] = float(values[idx])
+        chosen_fixed[axis] = float(values[idx])
 
-    sliced = yields_nd[tuple(slicer)]  # now 3D, axes in their original relative order
-    surviving_axes = [a for a in axes if a not in extra_axes]
-    perm = [surviving_axes.index("mass"), surviving_axes.index("metallicity"), surviving_axes.index("elements")]
-    sliced = np.transpose(sliced, axes=perm)
+    collapsed = yields_nd[tuple(slicer)]
+    remaining_axes = [a for a in axes if a not in fixed_axes]  # metallicity, mass, [pdf axes...], elements
 
-    table = YieldTable(
-        masses=np.asarray(grids["mass"], dtype=float),
-        metallicities=np.asarray(grids["metallicity"], dtype=float),
-        elements=list(grids["elements"]),
-        yields=sliced,
+    def build_table(pdf_idx_by_axis: dict) -> YieldTable:
+        s = [slice(None)] * collapsed.ndim
+        for axis, idx in pdf_idx_by_axis.items():
+            s[remaining_axes.index(axis)] = idx
+        sliced = collapsed[tuple(s)]
+        surviving = [a for a in remaining_axes if a not in pdf_idx_by_axis]
+        perm = [surviving.index("mass"), surviving.index("metallicity"), surviving.index("elements")]
+        sliced = np.transpose(sliced, axes=perm)
+        return YieldTable(
+            masses=np.asarray(grids["mass"], dtype=float),
+            metallicities=np.asarray(grids["metallicity"], dtype=float),
+            elements=list(grids["elements"]),
+            yields=sliced,
+        )
+
+    if not pdf_axes:
+        table = build_table({})
+        table.model = model
+        table.model_params = chosen_fixed
+        return table
+
+    tables_by_index = {}
+    grid_lengths = [len(grids[a]) for a in pdf_axes]
+    for idx_tuple in np.ndindex(*grid_lengths):
+        tables_by_index[idx_tuple] = build_table(dict(zip(pdf_axes, idx_tuple)))
+
+    stochastic = StochasticYieldTable(
+        tables_by_index=tables_by_index,
+        axis_names=pdf_axes,
+        axis_grids={a: np.asarray(grids[a], dtype=float) for a in pdf_axes},
+        axis_distributions={a: model_params[a] for a in pdf_axes},
     )
-    table.model = model  # lightweight provenance, not used by the interpolator
-    table.model_params = chosen
-    return table
+    stochastic.model = model
+    stochastic.model_params = {**chosen_fixed, **{a: model_params[a] for a in pdf_axes}}
+    return stochastic
 
 
 def _get_model_group(f, channel, model):

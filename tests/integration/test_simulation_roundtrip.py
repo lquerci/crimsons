@@ -7,6 +7,7 @@ from crimsons import (
     Simulation,
     StellarLifetime,
     default_channels,
+    ZSUN,
 )
 
 
@@ -16,7 +17,7 @@ def _make_simulation(**overrides):
         "lifetime_fn": StellarLifetime(),
         "channels": default_channels(),
         "mass_formed": 2000.0,
-        "metallicity": 0.02,
+        "metallicity": ZSUN,
         "n_realizations": 3,
         "seed": 123,
         "time_grid": np.linspace(0, 13.8, 30),
@@ -67,7 +68,7 @@ def test_simulation_with_pisn_runs_end_to_end():
     sim = _make_simulation(
         channels=[*default_channels(), PISN()],
         imf=Salpeter1955(m_min=0.8, m_max=1000.0),
-        metallicity=1e-6,
+        metallicity=1e-7,
         mass_formed=500_000.0,
         n_realizations=2,
     )

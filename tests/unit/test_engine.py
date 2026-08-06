@@ -1,10 +1,10 @@
 import numpy as np
 
-from crimsons.chemistry import ELEMENTS
+from crimsons.chemistry import ELEMENTS, ZSUN
 from crimsons.enrichment.engine import bin_enrichment, run_realization
 from crimsons.imf.standard import Salpeter1955
 from crimsons.stars.lifetimes import StellarLifetime
-from crimsons.yields.channels import default_channels
+from crimsons.yields.channels import default_channels, SNII
 
 
 def test_run_realization_smoke():
@@ -16,7 +16,7 @@ def test_run_realization_smoke():
     bin_masses, bin_counts, fates, events = run_realization(
         imf,
         mass_formed=5000.0,
-        metallicity=0.02,
+        metallicity=0.002,
         channels=channels,
         lifetime_fn=lifetime_fn,
         rng=rng,
@@ -46,13 +46,13 @@ def test_event_yields_are_scaled_by_bin_count():
 
     # a small population: some bins will have small counts
     _, small_counts, _, small_events = run_realization(
-        imf, mass_formed=2000.0, metallicity=0.02, channels=channels,
+        imf, mass_formed=2000.0, metallicity=ZSUN, channels=channels,
         lifetime_fn=lifetime_fn, rng=np.random.default_rng(3),
     )
     # a much larger population with the same seed-derived shape: bins
     # should carry larger counts and proportionally larger event yields
     _, large_counts, _, large_events = run_realization(
-        imf, mass_formed=200_000.0, metallicity=0.02, channels=channels,
+        imf, mass_formed=200_000.0, metallicity=ZSUN, channels=channels,
         lifetime_fn=lifetime_fn, rng=np.random.default_rng(3),
     )
 

@@ -5,6 +5,7 @@ import numpy as np
 import pytest
 
 from crimsons.chemistry import ELEMENTS, ZSUN
+from crimsons.yields.base import MetallicityOutOfRangeWarning
 from crimsons.yields.channels import (
     AGB,
     PISN,
@@ -47,7 +48,7 @@ def test_plain_3d_model_loads_and_matches_grid_point_exactly():
     assert table.metallicities.tolist() == NK_met_list
 
     # synth_yield(mass=20, z=0.0, elem_idx=0) = 1e-3*20*1*(1+0)*1.0
-    y = table(mass=20.0, metallicity=0.0)
+    y = table(mass=20.0, metallicity=1e-7)
     assert y[0, 0] == pytest.approx(8.7742)
 
 
@@ -94,14 +95,17 @@ def test_missing_one_of_two_required_params_names_the_axis():
 
 
 def test_single_metallicity_model_uses_1d_fallback():
-    """PISN/HW has only Z=0 -- this must not crash trying to build a 2D
-    interpolator, and metallicity should be irrelevant to the result."""
+    """PISN/HW has only Z=0 (Population III only) -- this must not crash
+    trying to build a 2D interpolator. Querying elsewhere within the
+    Population III regime should warn and clamp to that one point;
+    metallicity should otherwise be irrelevant to the result."""
     table = load_yield_table_hdf5(H5_PATH, "PISN", "HW")
     assert table.metallicities.tolist() == [1e-7]
 
     y_z0 = table(mass=200.0, metallicity=1e-7)
-    y_other_z = table(mass=200.0, metallicity=0.02)
-    np.testing.assert_allclose(y_z0, y_other_z)
+    with pytest.warns(MetallicityOutOfRangeWarning):
+        y_nearby = table(mass=200.0, metallicity=1e-8)  # still Population III (threshold 3e-7)
+    np.testing.assert_allclose(y_z0, y_nearby)
 
 
 def test_extra_axis_with_a_single_value_is_auto_selected(tmp_path):
@@ -111,7 +115,7 @@ def test_extra_axis_with_a_single_value_is_auto_selected(tmp_path):
     with h5py.File(path, "w") as f:
         g = f.create_group("SNII/ONEVAL")
         g.create_dataset("yields", data=np.arange(2 * 2 * 1 * 3, dtype=float).reshape(2, 2, 1, 3))
-        g.create_dataset("metallicity", data=[0.0, 0.02])
+        g.create_dataset("metallicity", data=[1e-7, ZSUN])
         g.create_dataset("mass", data=[10.0, 20.0])
         g.create_dataset("extra", data=[5.0])
         g.create_dataset("elements", data=np.array(["H", "He", "C"], dtype=h5py.string_dtype()))
@@ -134,20 +138,23 @@ def test_list_and_describe_available_models_convenience_wrappers():
 
 
 def test_channels_construct_with_default_and_explicit_models():
+    # each queried at a metallicity its bundled model actually covers --
+    # AGB/MM has no Population III data (see test_channels_hdf5.py's
+    # dedicated population-split tests for that case)
     snii_default = SNII()  # default model is NK, needs no model_params
     snii_rotating = SNII(model="LC", model_params={"rotation": 0})
-    agb = AGB(model="MM")
+    agb = AGB(model="VAN")
     pisn = PISN()
 
-    for channel, mass, mass_range in [
-        (snii_default, 25.0, (8.0, 40.0)),
-        (snii_rotating, 25.0, (8.0, 40.0)),
-        (agb, 3.0, (0.8, 8.0)),
-        (pisn, 200.0, (140.0, 260.0)),
+    for channel, mass, metallicity, mass_range in [
+        (snii_default, 25.0, ZSUN, (8.0, 40.0)),
+        (snii_rotating, 25.0, ZSUN, (8.0, 40.0)),
+        (agb, 3.0, ZSUN, (0.8, 8.0)),
+        (pisn, 200.0, 1e-7, (140.0, 260.0)),
     ]:
-        mask = channel.contributes(np.array([mass]), metallicity=0.0, rng=None)
+        mask = channel.contributes(np.array([mass]), metallicity=metallicity, rng=None)
         assert mask[0]
-        y = channel.yields(np.array([mass]), metallicity=0.0)
+        y = channel.yields(np.array([mass]), metallicity=metallicity, rng=None)
         assert y.shape == (1, len(ELEMENTS))
         assert np.all(y >= 0)
         assert channel.mass_min, channel.mass_max == mass_range
@@ -158,3 +165,42 @@ def test_snii_with_no_args_does_not_require_model_params():
     force a rotation/energy/mixing choice on the user."""
     channel = SNII()
     assert channel.model == "NK"
+
+
+def test_regime_with_no_data_raises_clear_error():
+    """SNII/LC's real metallicity grid ([1.42e-5 .. 1.42e-2]) has zero
+    Population III coverage -- querying below the threshold must raise,
+    not silently reuse Population II/I yields."""
+    table = load_yield_table_hdf5(H5_PATH, "SNII", "LC", model_params={"rotation": 0})
+    with pytest.raises(ValueError, match="Population III"):
+        table(mass=25.0, metallicity=1e-8)
+
+
+def test_regime_missing_the_other_direction():
+    """AGB/MM's real grid is Population III only (Z=1e-7) -- querying at
+    a normal metallicity must raise, not silently reuse PopIII yields."""
+    table = load_yield_table_hdf5(H5_PATH, "AGB", "MM")
+    with pytest.raises(ValueError, match="Population II/I"):
+        table(mass=3.0, metallicity=ZSUN)
+
+
+def test_regime_split_never_blends_across_the_threshold():
+    """A model with coverage on both sides (SNII/NK) must not produce a
+    value that's some blend of its lowest PopIII point and its lowest
+    PopII/I point -- querying just above vs just below the threshold
+    should land on two independently-interpolated regimes, not one
+    smooth curve straddling both."""
+    import warnings as _warnings
+
+    table = load_yield_table_hdf5(H5_PATH, "SNII", "NK")
+    # NK's grid: Z = [1e-7 (PopIII), 0.001, 0.004, 0.008, 0.02, 0.05 (PopII/I)]
+    with _warnings.catch_warnings():
+        _warnings.simplefilter("ignore", MetallicityOutOfRangeWarning)
+        just_below = table(mass=20.0, metallicity=2.9e-7)  # PopIII -> clamps to 1e-7
+        just_above = table(mass=20.0, metallicity=3.1e-7)  # PopII/I -> clamps to its lowest point, 0.001
+        at_popIII_point = table(mass=20.0, metallicity=1e-7)
+        at_lowest_popII_point = table(mass=20.0, metallicity=0.001)
+
+    np.testing.assert_allclose(just_below, at_popIII_point)
+    np.testing.assert_allclose(just_above, at_lowest_popII_point)
+    assert not np.allclose(just_below, just_above)
