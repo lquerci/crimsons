@@ -1,4 +1,4 @@
-from .chemistry import ELEMENTS
+from .chemistry import ELEMENTS, ZSUN
 from .imf.functional import FunctionalIMF
 from .imf.standard import Kroupa2001, Salpeter1955
 from .results import EnrichmentResult
