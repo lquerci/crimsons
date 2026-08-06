@@ -4,7 +4,7 @@ from importlib.resources import files
 
 import numpy as np
 
-from .base import Channel, MassRangeChannel
+from .base import MassRangeChannel, PopulationChannel
 from .io import describe_model, list_models, load_yield_table, load_yield_table_hdf5
 
 _DATA_DIR = files("crimsons.yields") / "data"
@@ -23,7 +23,7 @@ _STELLAR_YIELDS_H5 = _DATA_DIR / "stellar_yields.h5"
 # grid value, "which rotation velocity" is a real physics choice this
 # library shouldn't make quietly) -- pass model="LC",
 # model_params={"rotation": ...} yourself when you want it.
-DEFAULT_MODELS = {"SNII": "NK", "AGB": "VAN", "PISN": "HW"}
+DEFAULT_MODELS = {"SNII": "NK", "AGB": "VAN", "PISN": "HW", "SNIa": "Iwamoto"}
 
 
 def _default_yield_table(channel, model, model_params, h5_path):
@@ -111,61 +111,205 @@ class PISN(MassRangeChannel):
         super().__init__("PISN", mass_min, mass_max, table)
 
 
-class SNIa(Channel):
-    """SN Ia progenitors via a binary fraction and a delay-time
-    distribution (DTD), following the standard approach in stochastic
-    chemical evolution models (e.g. Matteucci & Greggio 1986; Greggio
-    2005) -- since SN Ia progenitors are white dwarfs in binaries, not
-    single stars, this is NOT a MassRangeChannel like SNII/AGB/PISN.
+def _dtd_mannucci(tau, tau_min, tau_max):
+    """Mannucci+06 / Matteucci+06 double-Gaussian-in-log-time DTD shape
+    (unnormalized -- population_events normalizes it). tau, tau_min,
+    tau_max in Myr; ported directly from the Fortran dtd_mannucci
+    function, including its internal Myr -> yr conversion and the
+    prompt/delayed split at t0 = 10^7.93 yr."""
+    tau = np.atleast_1d(np.asarray(tau, dtype=float))
+    out = np.zeros_like(tau)
+    in_range = (tau >= tau_min) & (tau <= tau_max)
+    if not np.any(in_range):
+        return out
 
-    The progenitor mass range, binary fraction, and DTD shape/normalization
-    here are illustrative placeholders, as is the bundled CSV yield table.
-    This channel's whole approach -- including how it interacts with the
-    log-mass-binned sampling in the engine -- is a known TODO to rework
-    separately; it's unaffected by the SNII/AGB/PISN changes here.
+    t_yr = tau * 1.0e6
+    log_t = np.log10(np.clip(t_yr, 1e-30, None))
+    t0 = 10.0**7.93
+
+    a1, b1, c1 = 1.4, -50.0, -7.7
+    a2, b2, c2 = -0.8, -0.9, -8.7
+
+    prompt = in_range & (t_yr <= t0)
+    delayed = in_range & (t_yr > t0)
+    out[prompt] = 10.0 ** (a1 + b1 * (log_t[prompt] + c1) ** 2)
+    out[delayed] = 10.0 ** (a2 + b2 * (log_t[delayed] + c2) ** 2)
+    return out
+
+
+def _dtd_maoz(tau, min_time, slope: float = 1.12):
+    """Maoz+12 power-law DTD shape (unnormalized). tau, min_time in Myr;
+    ported directly from the Fortran dtd_maoz function."""
+    tau = np.atleast_1d(np.asarray(tau, dtype=float))
+    out = np.zeros_like(tau)
+    mask = tau > min_time
+    out[mask] = (tau[mask] / min_time) ** (-slope)
+    return out
+
+
+_DTD_SHAPES = {"mannucci": _dtd_mannucci, "maoz": _dtd_maoz}
+# literature SNIa-per-Msun-formed rates, one per DTD shape -- matching
+# the Fortran's SNIa_number_per_Msun for flag_SNIa_mode 2 and 3
+_DEFAULT_RATE_PER_MSUN = {"mannucci": 0.0025, "maoz": 0.0013}
+
+
+def _integerize_with_carry(expected_per_bin):
+    """Convert a (generally fractional) expected-count-per-bin array
+    into integer counts via deterministic remainder carry-over: each
+    bin's leftover fraction is added to the next bin's expected count
+    rather than rounded away, so the running total is conserved exactly.
+    Ported directly from the Fortran's SNIa_remainder bookkeeping in
+    SNaIa_chem_evolution. Not random -- same input always gives the same
+    output, unlike a Poisson draw.
+    """
+    counts = np.zeros_like(expected_per_bin)
+    remainder = 0.0
+    for i, expected in enumerate(expected_per_bin):
+        total = expected + remainder
+        n = np.floor(total)
+        remainder = total - n
+        counts[i] = n
+    return counts
+
+
+class SNIa(PopulationChannel):
+    """SN Ia enrichment from the population as a whole -- ported from a
+    Fortran supernovae_Ia module that offered exactly two modes
+    (flag_SNIa_mode):
+
+    mode="dtd" (default): explosions follow a delay-time distribution
+        SHAPE (dtd_shape="mannucci" (Mannucci+06/Matteucci+06, default)
+        or "maoz" (Maoz+12)), normalized to integrate to 1 over the
+        run's time_grid, then scaled by rate_per_msun (SNIa per Msun of
+        stars formed -- defaults to the literature value for the chosen
+        shape: 0.0025 for mannucci, 0.0013 for maoz) to get an absolute
+        expected number of explosions per time bin. The DTD's support is
+        bounded below/above by the progenitor mass range's (default
+        0.8-8 Msun) lifetimes, via whatever lifetime_fn the Simulation
+        uses.
+
+    mode="single_burst": every eligible SNIa (rate_per_msun * mass_formed
+        of them) explodes at one fixed delay after formation
+        (burst_delay_myr) -- the discretized limit of a delta-function
+        DTD, i.e. "a fixed fraction of the mass formed goes off as SN Ia
+        at a specific time". rate_per_msun has no literature default in
+        this mode (it's an inherently simplified treatment, calibrated
+        per-model rather than from a population-integrated rate) and
+        must be given explicitly.
+
+    Either way, the (generally fractional) expected number of explosions
+    per time bin is converted to an integer count via deterministic
+    remainder carry-over, not a random draw -- see
+    _integerize_with_carry, ported from the Fortran's SNIa_remainder.
+
+    One simplification from the Fortran: explosion counts here scale
+    directly with mass_formed * rate_per_msun, without the extra
+    correction the original applied for how ITS specific fixed-mass-bin
+    IMF discretization diverged from the analytic IMF integral over the
+    progenitor range (number_stars_08_8 / number_stars / (P(...)-P(...))
+    in initialize_DTD). This library's bins already track actual sampled
+    star counts directly rather than a separately-tabulated analytic CDF,
+    so that particular correction doesn't have an equivalent role here --
+    say if you want it added back for closer numerical parity with the
+    Fortran.
+
+    Yields are a single fixed per-explosion composition (doesn't vary
+    with progenitor mass, matching the Fortran's fixed SNIa_ele array)
+    -- pass yield_table= for your own, or it loads the bundled
+    snia_placeholder.csv.
     """
 
     def __init__(
         self,
-        progenitor_mass_range=(3.0, 8.0),
-        binary_fraction: float = 0.05,
-        dtd_power: float = 1.0,
-        dtd_min_delay_gyr: float = 0.04,
-        dtd_max_delay_gyr: float = 13.0,
+        mode: str = "dtd",
+        dtd_shape: str = "maoz",
+        rate_per_msun: float | None = None,
+        burst_delay_myr: float | None = None,
         yield_table=None,
+        mass_min: float = 3.0,
+        mass_max: float = 8.0,
+        model: str | None = None,
+        model_params: dict | None = None,
+        h5_path=None,
     ):
+        
+        if mode not in ("dtd", "single_burst"):
+            raise ValueError(f"mode must be 'dtd' or 'single_burst', got {mode!r}")
+        if mode == "dtd" and dtd_shape not in _DTD_SHAPES:
+            raise ValueError(f"dtd_shape must be one of {list(_DTD_SHAPES)}, got {dtd_shape!r}")
+        if mode == "single_burst" and burst_delay_myr is None:
+            raise ValueError("mode='single_burst' needs burst_delay_myr")
+        if mode == "single_burst" and rate_per_msun is None:
+            raise ValueError(
+                "mode='single_burst' has no literature-default rate_per_msun "
+                "(unlike the dtd modes) -- pass the SNIa-per-Msun-formed rate you want"
+            )
+
+        # fall back on the default model
+        model = model if model else DEFAULT_MODELS["SNIa"] 
+
+        # Ensure model_params is a dictionary, not None
+        model_params = dict(model_params or {})
+
+        if model == "Iwamoto" and "model" not in model_params:
+            model_params["model"] = "W7"
+
         self.name = "SNIa"
-        self.progenitor_mass_range = progenitor_mass_range
-        self.binary_fraction = binary_fraction
-        self.dtd_power = dtd_power
-        self.dtd_min_delay_gyr = dtd_min_delay_gyr
-        self.dtd_max_delay_gyr = dtd_max_delay_gyr
-        self._yield_table = yield_table or _default_snia_table()
-
-    def contributes(self, mass, metallicity, rng):
-        lo, hi = self.progenitor_mass_range
-        in_range = (mass >= lo) & (mass <= hi)
-        is_binary = rng.random(mass.shape) < self.binary_fraction
-        return in_range & is_binary
-
-    def delay_time(self, mass, metallicity, lifetime, rng):
-        # power-law DTD: dN/dt ~ t^-dtd_power, sampled via inverse CDF, then
-        # added on top of the progenitor's own lifetime
-        u = rng.random(mass.shape)
-        tmin, tmax = self.dtd_min_delay_gyr, self.dtd_max_delay_gyr
-        n = 1.0 - self.dtd_power
-        if np.isclose(n, 0.0):
-            extra = tmin * (tmax / tmin) ** u
-        else:
-            extra = (u * (tmax**n - tmin**n) + tmin**n) ** (1.0 / n)
-        return lifetime + extra
+        self.mode = mode
+        self.model = model
+        self.dtd_shape = dtd_shape
+        self.rate_per_msun = (
+            rate_per_msun if rate_per_msun is not None else _DEFAULT_RATE_PER_MSUN[dtd_shape]
+        )
+        self.progenitor_mass_range = (mass_min, mass_max)
+        self.burst_delay_myr = burst_delay_myr
+        #self._yield_table = yield_table or _default_snia_table()
+        self._yield_table = yield_table or _default_yield_table("SNIa", self.model, model_params, h5_path)
 
     def yield_table(self):
         return self._yield_table
+
+    def population_events(self, mass_formed, metallicity, lifetime_fn, time_grid, rng):
+        time_grid = np.asarray(time_grid, dtype=float)
+        dt = np.diff(time_grid)
+        dt = np.append(dt, dt[-1]) if len(dt) else np.ones_like(time_grid)
+
+        if self.mode == "single_burst":
+            idx = min(int(np.searchsorted(time_grid, self.burst_delay_myr)), len(time_grid) - 1)
+            expected = np.zeros_like(time_grid)
+            expected[idx] = self.rate_per_msun * mass_formed
+        else:
+            mass_lo, mass_hi = self.progenitor_mass_range
+            tau_min = float(lifetime_fn(np.array([mass_hi]), metallicity)[0])  # shorter-lived, more massive
+            tau_max = float(lifetime_fn(np.array([mass_lo]), metallicity)[0])  # longer-lived, less massive
+
+            shape_fn = _DTD_SHAPES[self.dtd_shape]
+            shape = (
+                shape_fn(time_grid, tau_min, tau_max)
+                if self.dtd_shape == "mannucci"
+                else shape_fn(time_grid, tau_min)
+            )
+            norm = np.sum(shape * dt)
+            if norm <= 0:
+                return None
+            expected = mass_formed * self.rate_per_msun * (shape / norm) * dt
+
+        counts = _integerize_with_carry(expected)
+        mask = counts > 0
+        if not np.any(mask):
+            return None
+
+        times = time_grid[mask]
+        n_events = counts[mask]
+        # yields don't depend on progenitor mass -- pass the midpoint of
+        # the progenitor range as a formality the yield table still needs
+        representative_mass = np.array([sum(self.progenitor_mass_range) / 2.0])
+        one_event_yield = self.yield_table()(representative_mass, metallicity, rng=rng)
+        return times, one_event_yield * n_events[:, None], n_events
 
 
 def default_channels():
     """SNII + AGB + SNIa with default models/placeholder SNIa table. Add
     PISN yourself for Population III / extremely metal-poor runs, e.g.
     default_channels() + [PISN()]."""
-    return [SNII(), AGB()]
+    return [SNII(), AGB(), SNIa()]

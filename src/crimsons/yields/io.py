@@ -131,25 +131,40 @@ def load_yield_table_hdf5(h5_path, channel: str, model: str, model_params: dict 
     pdf_axes = [a for a in extra_axes if _is_distribution(model_params.get(a))]
     fixed_axes = [a for a in extra_axes if a not in pdf_axes]
 
-    # resolve FIXED axes first: collapse them out of yields_nd immediately
+    # Resolve FIXED axes
     slicer = [slice(None)] * yields_nd.ndim
     chosen_fixed = {}
     for axis in fixed_axes:
-        values = np.asarray(grids[axis], dtype=float)
-        if len(values) == 1:
+        axis_vals = grids[axis]
+        if len(axis_vals) == 1:
             idx = 0
         elif axis in model_params:
-            idx = int(np.argmin(np.abs(values - model_params[axis])))
+            param_val = model_params[axis]
+            # Check if axis contains strings (e.g. model sub-variants like W7, W70)
+            if isinstance(axis_vals[0], str):
+                str_vals = [str(v).upper() for v in axis_vals]
+                target = str(param_val).upper()
+                if target in str_vals:
+                    idx = str_vals.index(target)
+                else:
+                    raise ValueError(
+                        f"Value {param_val!r} for axis '{axis}' not found in {channel}/{model}. "
+                        f"Available choices: {axis_vals}"
+                    )
+            else:
+                # Numeric nearest-neighbor matching
+                num_vals = np.asarray(axis_vals, dtype=float)
+                idx = int(np.argmin(np.abs(num_vals - float(param_val))))
         else:
             raise ValueError(
-                f"{channel}/{model} has {len(values)} possible '{axis}' values "
-                f"{values.tolist()} -- pass model_params={{'{axis}': <value or distribution>}} to pick one"
+                f"{channel}/{model} has {len(axis_vals)} possible '{axis}' values "
+                f"{axis_vals} -- pass model_params={{'{axis}': <value or distribution>}} to pick one"
             )
         slicer[axes.index(axis)] = idx
-        chosen_fixed[axis] = float(values[idx])
+        chosen_fixed[axis] = axis_vals[idx]
 
     collapsed = yields_nd[tuple(slicer)]
-    remaining_axes = [a for a in axes if a not in fixed_axes]  # metallicity, mass, [pdf axes...], elements
+    remaining_axes = [a for a in axes if a not in fixed_axes]
 
     def build_table(pdf_idx_by_axis: dict) -> YieldTable:
         s = [slice(None)] * collapsed.ndim
@@ -200,6 +215,7 @@ def _get_model_group(f, channel, model):
 
 def _read_axis(group, axis):
     values = group[axis][:]
-    if axis == "elements":
-        return [v.decode() if isinstance(v, bytes) else v for v in values]
+    # Handle string/bytes datasets (e.g. elements, model sub-variants)
+    if values.dtype.kind in ("S", "O", "U"):
+        return [v.decode("utf-8") if isinstance(v, bytes) else str(v) for v in values]
     return values.tolist()

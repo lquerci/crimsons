@@ -102,7 +102,7 @@ class Simulation:
         seed_seq = np.random.SeedSequence(self.seed)
         child_seeds = seed_seq.spawn(self.n_realizations)
 
-        all_masses, all_counts, all_fates = [], [], []
+        all_masses, all_counts, all_fates, all_events = [], [], [], []
         enrichment = np.zeros((self.n_realizations, len(self.time_grid), len(ELEMENTS)))
 
         # managing of the progress bar
@@ -120,6 +120,7 @@ class Simulation:
                 self.metallicity,
                 self.channels,
                 self.lifetime_fn,
+                self.time_grid,
                 rng,
                 n_bins=self.n_bins,
                 chunk_size=self.sample_chunk_size,
@@ -128,6 +129,10 @@ class Simulation:
             all_counts.append(bin_counts)
             all_fates.append(fates)
             enrichment[i] = bin_enrichment(events, self.time_grid, len(ELEMENTS))
+
+            # remove the yields to save memory, keeping only (name, times, counts)
+            memory_safe_events = [(name, times, counts) for name, times, yields, counts in events]
+            all_events.append(memory_safe_events)
         result = EnrichmentResult(
             config=cfg,
             time=self.time_grid,
@@ -136,6 +141,7 @@ class Simulation:
             fates=all_fates,
             masses=all_masses,
             counts=all_counts,
+            events_history=all_events,
         )
 
         if cache_dir is not None:

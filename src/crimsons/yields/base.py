@@ -266,3 +266,43 @@ class MassRangeChannel(Channel):
 
     def yield_table(self):
         return self._yield_table
+
+
+class PopulationChannel(Channel):
+    """A channel whose events come from the stellar population as a
+    whole (e.g. integrated over a delay-time distribution, or a fixed
+    fraction of the total mass formed) rather than from selecting
+    individual stars by mass -- currently just SN Ia.
+
+    This doesn't fit MassRangeChannel's "which stars, at their own
+    lifetime" pattern at all: a DTD's whole point is that explosions are
+    spread over cosmic time independent of any single star's lifetime,
+    and the number of explosions in a time bin is a population-level
+    statistic, not a per-star yes/no. So instead of contributes/
+    delay_time, the engine calls `population_events` directly for any
+    channel of this kind (dispatched via isinstance, in
+    enrichment/engine.py), and skips the per-star mass-selection path
+    entirely -- accordingly, PopulationChannel instances never appear in
+    a realization's `fates` array (that array describes what happened to
+    each mass bin; population events aren't attributed to one).
+
+    contributes/delay_time are given harmless/defensive default
+    implementations below (never called by the engine for this channel
+    kind) purely so this remains a valid Channel.
+    """
+
+    def contributes(self, mass, metallicity, rng):
+        return np.zeros(np.asarray(mass).shape, dtype=bool)
+
+    def delay_time(self, mass, metallicity, lifetime, rng):
+        raise NotImplementedError(
+            f"{type(self).__name__} is a PopulationChannel -- events come from "
+            "population_events(), not the per-star contributes/delay_time path"
+        )
+
+    @abstractmethod
+    def population_events(self, mass_formed, metallicity, lifetime_fn, time_grid, rng):
+        """(times, yields) for this realization, or None if nothing
+        happened -- `times` a subset of `time_grid`'s points, `yields`
+        shape (len(times), n_elements), already scaled by however many
+        discrete events occurred at each time."""

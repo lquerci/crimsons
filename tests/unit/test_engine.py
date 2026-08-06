@@ -19,6 +19,7 @@ def test_run_realization_smoke():
         metallicity=0.002,
         channels=channels,
         lifetime_fn=lifetime_fn,
+        time_grid=np.logspace(0,4,50),
         rng=rng,
     )
 
@@ -47,18 +48,20 @@ def test_event_yields_are_scaled_by_bin_count():
     # a small population: some bins will have small counts
     _, small_counts, _, small_events = run_realization(
         imf, mass_formed=2000.0, metallicity=ZSUN, channels=channels,
-        lifetime_fn=lifetime_fn, rng=np.random.default_rng(3),
+        lifetime_fn=lifetime_fn, rng=np.random.default_rng(3), 
+        time_grid=np.logspace(0,4,50),
     )
     # a much larger population with the same seed-derived shape: bins
     # should carry larger counts and proportionally larger event yields
     _, large_counts, _, large_events = run_realization(
         imf, mass_formed=200_000.0, metallicity=ZSUN, channels=channels,
         lifetime_fn=lifetime_fn, rng=np.random.default_rng(3),
+        time_grid=np.logspace(0,4,50),
     )
 
     assert large_counts.sum() > small_counts.sum()
 
     def total_yield(events):
-        return sum(float(np.sum(yields)) for _, _, yields in events)
+        return sum(float(np.sum(yields)) for _, _, yields, _ in events)
 
     assert total_yield(large_events) > total_yield(small_events)

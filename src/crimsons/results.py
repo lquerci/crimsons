@@ -23,6 +23,7 @@ class EnrichmentResult:
     fates: list  # list of (n_bins_i,) object arrays, one per realization
     masses: list  # list of (n_bins_i,) float arrays -- mean mass per populated bin
     counts: list  # list of (n_bins_i,) float arrays -- stars represented by each bin
+    events_history: list # raw (name, times, yields) tuples per realization
 
     def mean(self) -> np.ndarray:
         """Mean enrichment across realizations, shape (n_time, n_elements)."""

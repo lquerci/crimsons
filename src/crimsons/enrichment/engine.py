@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import numpy as np
 
+from ..yields.base import PopulationChannel
+
 
 def run_realization(
     imf,
@@ -9,6 +11,7 @@ def run_realization(
     metallicity,
     channels,
     lifetime_fn,
+    time_grid,
     rng,
     n_bins: int = 1000,
     chunk_size: int = 1_000_000,
@@ -63,15 +66,29 @@ def run_realization(
     events = []
 
     for channel in channels:
-        mask = channel.contributes(bin_masses, metallicity, rng)
-        if not np.any(mask):
-            continue
-        m_sub = bin_masses[mask]
-        c_sub = bin_counts[mask]
-        t_sub = channel.delay_time(m_sub, metallicity, lifetimes[mask], rng)
-        y_sub = channel.yields(m_sub, metallicity, rng) * c_sub[:, None]
-        events.append((channel.name, np.asarray(t_sub), np.asarray(y_sub)))
-        fates[mask] = channel.name
+        # BRANCH 1: PopulationChannel (e.g. SNIa DTD) ---
+        if isinstance(channel, PopulationChannel):
+            pop_res = channel.population_events(
+                mass_formed=mass_formed,
+                metallicity=metallicity,
+                lifetime_fn=lifetime_fn,
+                time_grid=time_grid,
+                rng=rng,
+            )
+            if pop_res is not None:
+                t_pop, y_pop, n_events_pop = pop_res
+                events.append((channel.name, np.asarray(t_pop), np.asarray(y_pop), np.asarray(n_events_pop)))
+        # BRANCH 2: MassRangeChannel (AGB, SNII, PISN)
+        else:
+            mask = channel.contributes(bin_masses, metallicity, rng)
+            if not np.any(mask):
+                continue
+            m_sub = bin_masses[mask]
+            c_sub = bin_counts[mask]
+            t_sub = channel.delay_time(m_sub, metallicity, lifetimes[mask], rng)
+            y_sub = channel.yields(m_sub, metallicity, rng) * c_sub[:, None]
+            events.append((channel.name, np.asarray(t_sub), np.asarray(y_sub), np.asarray(c_sub)))
+            fates[mask] = channel.name
 
     return bin_masses, bin_counts, fates, events
 
@@ -92,7 +109,7 @@ def bin_enrichment(events, time_grid, n_elements):
     """
     time_grid = np.asarray(time_grid)
     increments = np.zeros((len(time_grid), n_elements))
-    for _name, times, yields in events:
+    for _name, times, yields, n_events in events:
         idx = np.searchsorted(time_grid, times, side="right") - 1
         idx = np.clip(idx, 0, len(time_grid) - 1)
         np.add.at(increments, idx, yields)
