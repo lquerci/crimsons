@@ -19,6 +19,7 @@ __all__ = [
     "ELEMENTS",
     "PISN",
     "SNII",
+    "ZSUN",
     "EnrichmentResult",
     "FunctionalIMF",
     "Kroupa2001",

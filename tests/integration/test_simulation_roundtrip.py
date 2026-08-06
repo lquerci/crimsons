@@ -2,12 +2,12 @@ import numpy as np
 
 from crimsons import (
     PISN,
+    ZSUN,
     EnrichmentResult,
     Salpeter1955,
     Simulation,
     StellarLifetime,
     default_channels,
-    ZSUN,
 )
 
 

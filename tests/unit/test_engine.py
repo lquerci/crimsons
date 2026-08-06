@@ -4,7 +4,7 @@ from crimsons.chemistry import ELEMENTS, ZSUN
 from crimsons.enrichment.engine import bin_enrichment, run_realization
 from crimsons.imf.standard import Salpeter1955
 from crimsons.stars.lifetimes import StellarLifetime
-from crimsons.yields.channels import default_channels, SNII
+from crimsons.yields.channels import default_channels
 
 
 def test_run_realization_smoke():
