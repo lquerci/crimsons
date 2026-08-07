@@ -1,0 +1,26 @@
+/* Small polish on top of the Material theme -- safe to delete this file
+   and its extra_css entry in mkdocs.yml if you'd rather stick to
+   stock Material styling. */
+
+:root {
+  --md-code-font: "Roboto Mono", monospace;
+}
+
+/* Slightly tighter, card-like admonitions */
+.md-typeset .admonition,
+.md-typeset details {
+  border-radius: 0.4rem;
+  border-width: 0;
+  border-left-width: 0.2rem;
+}
+
+/* Give the API reference's mkdocstrings headings a bit more breathing
+   room from the source-code blocks that follow them */
+.md-typeset .doc-heading {
+  margin-top: 1.6em;
+}
+
+/* Make inline math a touch less cramped next to surrounding text */
+.md-typeset .arithmatex {
+  font-size: 1.02em;
+}

@@ -7,6 +7,12 @@ build:
 
 python:
   install:
+    # Doc-build dependencies (mkdocs-material, mkdocstrings, ...)
+    - requirements: docs/requirements.txt
+    # The package itself, so mkdocstrings can import `crimsons` and pull
+    # live docstrings/signatures for the API reference. Adjust the path
+    # if your pyproject.toml / setup.py lives somewhere other than the
+    # repository root.
     - method: pip
       path: .
       extra_requirements:

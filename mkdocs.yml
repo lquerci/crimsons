@@ -1,36 +1,176 @@
-site_name: crimsons documentation
+site_name: CRIMSONS
 site_description: Chemical Evolution Yield & IMF Stochastic Engine
+site_author: The CRIMSONS Contributors
+
+# TODO: point these at your real repository/homepage before publishing --
+# repo_url also switches on the "edit this page" pencil icon (already
+# enabled below via content.action.edit) and the GitHub link in the header.
+site_url: https://your-org.github.io/crimsons/
+repo_url: https://github.com/your-org/crimsons
+repo_name: your-org/crimsons
+edit_uri: edit/main/docs/
+
+copyright: Copyright &copy; 2026 The CRIMSONS Contributors
 
 theme:
   name: material
+  logo: assets/logo.png
+  favicon: assets/logo.png
+
   palette:
-    primary: indigo
-    accent: deep orange
+    - scheme: default
+      primary: indigo
+      accent: deep orange
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to dark mode
+
+    - scheme: slate
+      primary: indigo
+      accent: deep orange
+      toggle:
+        icon: material/weather-night
+        name: Switch to light mode
+
+  font:
+    text: Roboto
+    code: Roboto Mono
+
   features:
+    - navigation.instant
+    - navigation.instant.progress
+    - navigation.tabs
+    - navigation.tabs.sticky
     - navigation.sections
     - navigation.expand
+    - navigation.indexes
+    - navigation.top
+    - navigation.footer
+    - toc.follow
+    - search.highlight
+    - search.share
+    - search.suggest
     - content.code.copy
+    - content.code.annotate
+    - content.tabs.link
     - content.action.edit
+    - content.tooltips
+
+nav:
+  - Home: index.md
+  - Getting Started:
+      - Installation: getting-started/installation.md
+      - Quickstart: getting-started/quickstart.md
+  - Examples:
+      - Basic Simulation: examples/basic-simulation.md
+      - Custom IMF Shapes: examples/custom-imf.md
+      - Selecting Yield Models: examples/yield-models.md
+      - Caching & Persistence: examples/caching-results.md
+  - Physics:
+      - Overview: physics/index.md
+      - Initial Mass Function: physics/imf.md
+      - Stellar Lifetimes: physics/lifetimes.md
+      - Enrichment Channels: physics/channels.md
+      - Metallicity & Population III: physics/metallicity.md
+      - Stochastic Sampling: physics/sampling.md
+  - API Reference:
+      - Overview: api/index.md
+      - Simulation: api/simulation.md
+      - Initial Mass Functions: api/imf.md
+      - Stellar Lifetimes: api/stars.md
+      - Yields & Channels: api/yields.md
+      - Enrichment Engine: api/enrichment.md
+      - Results & Config: api/core.md
+      - I/O & Caching: api/io.md
+  - Changelog: changelog.md
+  - Contributing: contributing.md
 
 plugins:
-  - search
+  - search:
+      lang: en
   - mkdocstrings:
+      default_handler: python
       handlers:
         python:
+          paths: [src]
           options:
+            # The docstrings in this codebase are NumPy-style ("Parameters
+            # ----------", "Returns", ...), not Google-style -- this was
+            # previously set to `google`, which silently mis-renders every
+            # docstring's sections. See CONTRIBUTING for the convention.
+            docstring_style: numpy
+            docstring_section_style: table
+            show_source: true
             show_root_heading: true
-            show_source: false
+            show_root_full_path: false
+            show_category_heading: true
+            show_symbol_type_heading: true
+            show_symbol_type_toc: true
+            show_signature_annotations: true
+            separate_signature: true
+            signature_crossrefs: true
+            merge_init_into_class: true
+            members_order: source
+            heading_level: 2
+            filters:
+              - "!^_"
+  - git-revision-date-localized:
+      type: date
+      fallback_to_build_date: true
+      enable_creation_date: false
 
 markdown_extensions:
-  - pymdownx.arithmatex:
-      generic: true
+  - abbr
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+      title: On this page
+  - pymdownx.betterem:
+      smart_enable: all
+  - pymdownx.caret
+  - pymdownx.details
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
   - pymdownx.highlight:
       anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
   - pymdownx.inlinehilite
+  - pymdownx.keys
+  - pymdownx.mark
   - pymdownx.snippets
-  - pymdownx.superfences
-  - admonition
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.arithmatex:
+      generic: true
+
+extra:
+  social:
+    # TODO: replace/remove with your project's real links
+    - icon: fontawesome/brands/github
+      link: https://github.com/your-org/crimsons
+    - icon: fontawesome/brands/python
+      link: https://pypi.org/project/crimsons/
+  # To add a version switcher later, deploy with `mike` and uncomment:
+  # version:
+  #   provider: mike
 
 extra_javascript:
   - javascripts/mathjax.js
   - https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
+
+extra_css:
+  - stylesheets/extra.css
