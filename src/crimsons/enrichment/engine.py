@@ -86,7 +86,28 @@ def run_realization(
             m_sub = bin_masses[mask]
             c_sub = bin_counts[mask]
             t_sub = channel.delay_time(m_sub, metallicity, lifetimes[mask], rng)
-            y_sub = channel.yields(m_sub, metallicity, rng) * c_sub[:, None]
+
+            # TODO: add a selection logic for the fast and slow approches
+            # FAST : sample the yields extra dimension once per mass bin
+            #y_sub = channel.yields(m_sub, metallicity, rng) * c_sub[:, None]
+                        
+            # SLOW: sample the yields extra dimension once per star
+
+            # ensure counts are integers
+            counts = np.round(c_sub).astype(int)
+
+            # unroll bin into a flat array
+            unrolled_m = np.repeat(m_sub, counts)
+
+            # get the yield for each individual stellar particle
+            unrolled_y = channel.yields(unrolled_m, metallicity, rng)
+
+            # group sum the yields
+            bin_indices = np.repeat(np.arange(len(m_sub)), counts)
+            y_sub = np.zeros((len(m_sub), unrolled_y.shape[1]))
+            np.add.at(y_sub, bin_indices, unrolled_y)
+
+            
             events.append((channel.name, np.asarray(t_sub), np.asarray(y_sub), np.asarray(c_sub)))
             fates[mask] = channel.name
 
@@ -110,7 +131,8 @@ def bin_enrichment(events, time_grid, n_elements):
     time_grid = np.asarray(time_grid)
     increments = np.zeros((len(time_grid), n_elements))
     for _name, times, yields, n_events in events:
-        idx = np.searchsorted(time_grid, times, side="right") - 1
+        # Find the first index where time_grid[idx] >= times
+        idx = np.searchsorted(time_grid, times, side="left")
         idx = np.clip(idx, 0, len(time_grid) - 1)
         np.add.at(increments, idx, yields)
     return np.cumsum(increments, axis=0)
