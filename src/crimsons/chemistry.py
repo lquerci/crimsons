@@ -193,7 +193,7 @@ def load_solar_abundances(path, column: str | None = None) -> SolarAbundances:
         raise ValueError(f"{path} has no data rows")
 
     if column is None:
-        candidates = [c for c in rows[0].keys() if c.lower() != "element"]
+        candidates = [c for c in rows[0] if c.lower() != "element"]
         if not candidates:
             raise ValueError(f"{path} has no abundance column besides 'element'")
         mass_like = [c for c in candidates if "mass" in c.lower()]
