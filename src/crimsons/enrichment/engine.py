@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from ..yields.base import PopulationChannel
+from ..yields.base import PopulationChannel, StochasticYieldTable
 
 
 def run_realization(
@@ -87,25 +87,32 @@ def run_realization(
             c_sub = bin_counts[mask]
             t_sub = channel.delay_time(m_sub, metallicity, lifetimes[mask], rng)
 
-            # TODO: add a selection logic for the fast and slow approches
-            # FAST : sample the yields extra dimension once per mass bin
-            #y_sub = channel.yields(m_sub, metallicity, rng) * c_sub[:, None]
-                        
-            # SLOW: sample the yields extra dimension once per star
+            is_stochastic = isinstance(channel._yield_table, StochasticYieldTable)            
 
-            # ensure counts are integers
-            counts = np.round(c_sub).astype(int)
+            # Decide route: Use slow (individual star) sampling only if it's stochastic 
+            # AND the total number of stars in this subset is small enough to avoid memory spikes.
+            total_stars_in_subset = np.sum(c_sub)
+            use_individual_sampling = is_stochastic and (total_stars_in_subset < 50_000)
 
-            # unroll bin into a flat array
-            unrolled_m = np.repeat(m_sub, counts)
+            if not use_individual_sampling: 
+                # FAST : sample the yields extra dimension once per mass bin
+                y_sub = channel.yields(m_sub, metallicity, rng) * c_sub[:, None]
+            else:                    
+                # SLOW: sample the yields extra dimension once per star
 
-            # get the yield for each individual stellar particle
-            unrolled_y = channel.yields(unrolled_m, metallicity, rng)
+                # ensure counts are integers
+                counts = np.round(c_sub).astype(int)
 
-            # group sum the yields
-            bin_indices = np.repeat(np.arange(len(m_sub)), counts)
-            y_sub = np.zeros((len(m_sub), unrolled_y.shape[1]))
-            np.add.at(y_sub, bin_indices, unrolled_y)
+                # unroll bin into a flat array
+                unrolled_m = np.repeat(m_sub, counts)
+
+                # get the yield for each individual stellar particle
+                unrolled_y = channel.yields(unrolled_m, metallicity, rng)
+
+                # group sum the yields
+                bin_indices = np.repeat(np.arange(len(m_sub)), counts)
+                y_sub = np.zeros((len(m_sub), unrolled_y.shape[1]))
+                np.add.at(y_sub, bin_indices, unrolled_y)
 
             
             events.append((channel.name, np.asarray(t_sub), np.asarray(y_sub), np.asarray(c_sub)))
