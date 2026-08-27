@@ -5,8 +5,9 @@ from .chemistry import (
     load_solar_abundances,
     set_default_solar_abundances,
 )
+from .imf.defaults import default_imf
 from .imf.functional import FunctionalIMF
-from .imf.standard import Kroupa2001, Salpeter1955
+from .imf.standard import Chabrier2003, Kroupa2001, Salpeter1955
 from .results import ElementSeries, EnrichmentResult
 from .simulation.ensemble import Simulation
 from .stars.lifetimes import StellarLifetime
@@ -26,6 +27,7 @@ __all__ = [
     "PISN",
     "SNII",
     "ZSUN",
+    "Chabrier2003",
     "ElementSeries",
     "EnrichmentResult",
     "FunctionalIMF",
@@ -36,6 +38,7 @@ __all__ = [
     "SolarAbundances",
     "StellarLifetime",
     "default_channels",
+    "default_imf",
     "describe_available_model",
     "list_available_models",
     "load_solar_abundances",

@@ -1,6 +1,6 @@
 import numpy as np
 
-from crimsons.chemistry import ELEMENTS, HDF_COLUMNS, ZSUN
+from crimsons.chemistry import HDF_COLUMNS, ZSUN
 from crimsons.enrichment.engine import bin_enrichment, run_realization
 from crimsons.imf.standard import Salpeter1955
 from crimsons.stars.lifetimes import StellarLifetime
@@ -10,13 +10,13 @@ from crimsons.yields.channels import default_channels
 def test_run_realization_smoke():
     imf = Salpeter1955()
     lifetime_fn = StellarLifetime()
-    channels = default_channels()
+    channels = default_channels(ZSUN)
     rng = np.random.default_rng(0)
 
     bin_masses, bin_counts, fates, events = run_realization(
         imf,
         mass_formed=5000.0,
-        metallicity=0.002,
+        metallicity=ZSUN,
         channels=channels,
         lifetime_fn=lifetime_fn,
         time_grid=np.logspace(0,4,50),
@@ -43,7 +43,7 @@ def test_event_yields_are_scaled_by_bin_count():
     mechanical point of threading counts through the engine."""
     imf = Salpeter1955()
     lifetime_fn = StellarLifetime()
-    channels = default_channels()
+    channels = default_channels(metallicity=ZSUN)
 
     # a small population: some bins will have small counts
     _, small_counts, _, small_events = run_realization(

@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import numpy as np
 
-from ..chemistry import ELEMENTS,HDF_COLUMNS, ZSUN
+from ..chemistry import HDF_COLUMNS, ZSUN
 from ..config import RunConfig
 from ..enrichment.engine import bin_enrichment, run_realization
+from ..imf.defaults import default_imf
 from ..io.cache import cache_path, try_load_cache
 from ..results import EnrichmentResult
 from ..stars.lifetimes import StellarLifetime
@@ -18,11 +19,17 @@ class Simulation:
 
     Parameters
     ----------
-    imf : crimsons.imf.base.IMF
-    lifetime_fn : crimsons.stars.lifetimes.LifetimeFunction
-    channels : list of crimsons.yields.base.Channel
     mass_formed : float, total stellar mass formed (Msun) per realization
     metallicity : float, metallicity of the formed stars. If negative is log Z/Z_sun, if positive is absolute Z
+    imf : crimsons.imf.base.IMF, optional -- defaults to a population-
+        appropriate crimsons.imf.defaults.default_imf(metallicity) if
+        not given, so `Simulation(mass_formed=..., metallicity=...)` on
+        its own already produces something physically reasonable
+    lifetime_fn : crimsons.stars.lifetimes.LifetimeFunction, optional --
+        defaults to StellarLifetime() if not given
+    channels : list of crimsons.yields.base.Channel, optional -- defaults
+        to crimsons.yields.channels.default_channels(metallicity) if not
+        given (also population-appropriate)
     n_realizations : int
     seed : int or None -- a master seed; each realization gets its own
         independently-spawned child seed (via numpy's SeedSequence), so
@@ -32,11 +39,11 @@ class Simulation:
 
     def __init__(
         self,
-        imf,
         mass_formed: float,
         metallicity: float,
+        imf=None,  # Optional: defaults to default_imf(metallicity) if None
         lifetime_fn=None,  # Optional: defaults to StellarLifetime() if None
-        channels=None,  # Optional: defaults to default_channels() if None
+        channels=None,  # Optional: defaults to default_channels(metallicity) if None
         n_realizations: int = 10,
         seed: int | None = None,
         time_grid=None,
@@ -44,7 +51,6 @@ class Simulation:
         sample_chunk_size: int = 1_000_000,
         verbose : bool = False,
     ):
-        self.imf = imf
         self.mass_formed = mass_formed
         self.n_realizations = n_realizations
         self.seed = seed
@@ -55,22 +61,24 @@ class Simulation:
         self.sample_chunk_size = sample_chunk_size
         self.verbose = verbose
 
-
         # Fallback to standard defaults if not explicitly provided
         self.lifetime_fn = (
             lifetime_fn if lifetime_fn is not None else StellarLifetime()
         )
-        self.channels = (
-            channels if channels is not None else default_channels()
-        )
 
-        # handling metallicity 
+        # handling metallicity -- resolved before imf/channels below,
+        # since both of their metallicity-adaptive defaults need it
         self.zsun = ZSUN
         self.metallicity_log, self.metallicity_abs = (
             self._normalize_metallicity(metallicity)
         )
         # Standardized attribute expected by downstream lookup tables / lifetime_fn
         self.metallicity = self.metallicity_abs
+
+        self.imf = imf if imf is not None else default_imf(self.metallicity)
+        self.channels = (
+            channels if channels is not None else default_channels(self.metallicity)
+        )
 
         # define imf interval in the metallicity
         self.imf.bind_metallicity(self.metallicity)

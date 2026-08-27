@@ -82,6 +82,10 @@ def describe_model(h5_path, channel: str, model: str) -> dict:
         info = {"axes": axes, "yields_shape": tuple(group["yields"].shape)}
         for axis in axes:
             info[axis] = _read_axis(group, axis)
+        
+        # Also report metallicity if it's stored as a dataset rather than an axis
+        if "metallicity" not in axes and "metallicity" in group:
+            info["metallicity"] = group["metallicity"][:]
         return info
 
 
@@ -123,7 +127,16 @@ def load_yield_table_hdf5(h5_path, channel: str, model: str, model_params: dict 
         yields_nd = group["yields"][:]
         grids = {axis: _read_axis(group, axis) for axis in axes}
 
-    for required in ("metallicity", "mass", "elements"):
+        # Handle models where metallicity is mapped to variants rather than an independent axis
+        has_z_axis = "metallicity" in axes
+        if not has_z_axis and "metallicity" not in group:
+            raise ValueError(f"{channel}/{model} is missing a required 'metallicity' axis or dataset")
+        
+        if not has_z_axis:
+            z_data = np.asarray(group["metallicity"][:])
+
+    # Now we only enforce mass and elements as strict axes
+    for required in ("mass", "elements"):
         if required not in axes:
             raise ValueError(f"{channel}/{model} is missing a required '{required}' axis; has {axes}")
 
@@ -131,9 +144,24 @@ def load_yield_table_hdf5(h5_path, channel: str, model: str, model_params: dict 
     pdf_axes = [a for a in extra_axes if _is_distribution(model_params.get(a))]
     fixed_axes = [a for a in extra_axes if a not in pdf_axes]
 
+    # Standardize mapped Z array shape to match the extra axes grid
+    if not has_z_axis:
+        expected_shape = tuple(len(grids[a]) for a in extra_axes)
+        if z_data.ndim == 0:
+            z_data = np.broadcast_to(z_data, expected_shape)
+        elif z_data.shape == expected_shape:
+            pass
+        elif z_data.ndim == 1 and len(extra_axes) > 1 and z_data.shape[0] == expected_shape[0]:
+            # Broadcast 1D mapped array to remaining extra axes if needed
+            new_shape = [expected_shape[0]] + [1] * (len(extra_axes) - 1)
+            z_data = np.broadcast_to(z_data.reshape(new_shape), expected_shape)
+        else:
+            raise ValueError(f"metallicity dataset shape {z_data.shape} does not match extra axes {expected_shape}")
+
     # Resolve FIXED axes
     slicer = [slice(None)] * yields_nd.ndim
     chosen_fixed = {}
+    resolved_indices = {}  # Keep track of indices to fetch Z later
     for axis in fixed_axes:
         axis_vals = grids[axis]
         if len(axis_vals) == 1:
@@ -162,6 +190,7 @@ def load_yield_table_hdf5(h5_path, channel: str, model: str, model_params: dict 
             )
         slicer[axes.index(axis)] = idx
         chosen_fixed[axis] = axis_vals[idx]
+        resolved_indices[axis] = idx
 
     collapsed = yields_nd[tuple(slicer)]
     remaining_axes = [a for a in axes if a not in fixed_axes]
@@ -172,11 +201,31 @@ def load_yield_table_hdf5(h5_path, channel: str, model: str, model_params: dict 
             s[remaining_axes.index(axis)] = idx
         sliced = collapsed[tuple(s)]
         surviving = [a for a in remaining_axes if a not in pdf_idx_by_axis]
-        perm = [surviving.index("mass"), surviving.index("metallicity"), surviving.index("elements")]
-        sliced = np.transpose(sliced, axes=perm)
+        
+        if has_z_axis:
+            perm = [surviving.index("mass"), surviving.index("metallicity"), surviving.index("elements")]
+            sliced = np.transpose(sliced, axes=perm)
+            z_grid = np.asarray(grids["metallicity"], dtype=float)
+        else:
+            # If Z isn't an axis, transpose just mass and elements, then expand to fake the Z axis
+            perm = [surviving.index("mass"), surviving.index("elements")]
+            sliced = np.transpose(sliced, axes=perm)
+            sliced = np.expand_dims(sliced, axis=1) # Shape becomes (n_mass, 1, n_elements)
+            
+            # Look up the Z value for this exact parameter combination
+            z_idx = []
+            for a in extra_axes:
+                if a in resolved_indices:
+                    z_idx.append(resolved_indices[a])
+                else:
+                    z_idx.append(pdf_idx_by_axis[a])
+            
+            z_val = float(z_data[tuple(z_idx)]) if z_idx else float(z_data)
+            z_grid = np.array([z_val], dtype=float)
+
         return YieldTable(
             masses=np.asarray(grids["mass"], dtype=float),
-            metallicities=np.asarray(grids["metallicity"], dtype=float),
+            metallicities=z_grid,
             elements=list(grids["elements"]),
             yields=sliced,
         )

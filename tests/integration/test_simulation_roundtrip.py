@@ -1,7 +1,6 @@
 import numpy as np
 
 from crimsons import (
-    PISN,
     ZSUN,
     EnrichmentResult,
     Salpeter1955,
@@ -15,7 +14,7 @@ def _make_simulation(**overrides):
     kwargs = {
         "imf": Salpeter1955(),
         "lifetime_fn": StellarLifetime(),
-        "channels": default_channels(),
+        "channels": default_channels(metallicity=ZSUN),
         "mass_formed": 2000.0,
         "metallicity": ZSUN,
         "n_realizations": 3,
@@ -54,7 +53,7 @@ def test_save_and_load_roundtrip(tmp_path):
 def test_simulation_resolves_metallicity_adaptive_imf_range():
     # imf is constructed with no explicit bounds and no metallicity of its
     # own -- Simulation's metallicity should drive the default range
-    sim = _make_simulation(metallicity=1e-7, imf=Salpeter1955())
+    sim = _make_simulation(metallicity=1e-7, imf=Salpeter1955(), channels=default_channels(metallicity=1e-7))
     result = sim.run()
     assert (sim.imf.m_min, sim.imf.m_max) == (0.8, 1000.0)
     assert result.config.imf_mass_min == 0.8
@@ -66,7 +65,7 @@ def test_simulation_with_pisn_runs_end_to_end():
     wide enough IMF range that some bins should actually land in PISN's
     140-260 Msun window."""
     sim = _make_simulation(
-        channels=[*default_channels(), PISN()],
+        channels=[*default_channels(1e-7)],
         imf=Salpeter1955(m_min=0.8, m_max=1000.0),
         metallicity=1e-7,
         mass_formed=500_000.0,

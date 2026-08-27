@@ -3,6 +3,7 @@ from __future__ import annotations
 import numpy as np
 
 from .base import IMF
+from .functional import FunctionalIMF
 
 
 class BrokenPowerLawIMF(IMF):
@@ -162,6 +163,54 @@ class Kroupa2001(BrokenPowerLawIMF):
             metallicity=metallicity,
             mass_range_fn=mass_range_fn,
         )
+
+def chabrier_lognormal_shape(m, m_ch: float = 0.35, alpha: float = 1.35):
+    """dN/dM ~ M^-(1+alpha) * exp(-m_ch/M) -- a Chabrier (2003)-type
+    shape: turns over below the characteristic mass `m_ch`, approaches a
+    M^-(1+alpha) power law well above it.
+
+    Not the literal piecewise Chabrier (2003) form (a separate
+    log-normal below 1 Msun spliced to a power law above) -- this is one
+    continuous function with the same qualitative shape, meant to be
+    used with `FunctionalIMF` (see `Chabrier2003`).
+    """
+    m = np.asarray(m, dtype=float)
+    return m ** -(1.0 + alpha) * np.exp(-m_ch / m)
+
+
+class Chabrier2003(FunctionalIMF):
+    """FunctionalIMF built from `chabrier_lognormal_shape`.
+
+    `m_ch` is the characteristic turnover mass -- 0.35 Msun (the usual
+    solar-neighborhood value) by default. Population III star formation
+    is often modeled as much more top-heavy, with a characteristic mass
+    of order several to ~10 Msun; see `crimsons.imf.defaults.default_imf`,
+    which raises `m_ch` to 10 automatically below
+    `crimsons.chemistry.POPIII_THRESHOLD`.
+    """
+
+    def __init__(
+        self,
+        m_min=None,
+        m_max=None,
+        metallicity=None,
+        mass_range_fn=None,
+        m_ch: float = 0.35,
+        alpha: float = 1.35,
+        n_grid: int = 2000,
+    ):
+        self.m_ch = m_ch
+        self.alpha = alpha
+        super().__init__(
+            chabrier_lognormal_shape,
+            m_min=m_min,
+            m_max=m_max,
+            metallicity=metallicity,
+            mass_range_fn=mass_range_fn,
+            n_grid=n_grid,
+            imf_params={"m_ch": m_ch, "alpha": alpha},
+        )
+
 
 class FlatIMF(BrokenPowerLawIMF):
     """Flat Initial Mass Function: dN/dM = constant on [m_min, m_max]."""

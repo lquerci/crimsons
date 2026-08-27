@@ -1,7 +1,7 @@
 import numpy as np
 
-from crimsons.stars.lifetimes import StellarLifetime
 from crimsons import ZSUN
+from crimsons.stars.lifetimes import StellarLifetime
 
 
 def test_lifetime_decreases_with_mass():

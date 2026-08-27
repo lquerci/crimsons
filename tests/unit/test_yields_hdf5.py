@@ -167,7 +167,7 @@ def test_snii_with_no_args_does_not_require_model_params():
     """The zero-config path (as used by default_channels()) must not
     force a rotation/energy/mixing choice on the user."""
     channel = SNII()
-    assert channel.model == "NK"
+    assert channel.model == "LC"
 
 
 def test_regime_with_no_data_raises_clear_error():

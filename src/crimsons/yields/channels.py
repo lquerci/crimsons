@@ -4,8 +4,9 @@ from importlib.resources import files
 
 import numpy as np
 
+from ..chemistry import POPIII_THRESHOLD
 from .base import MassRangeChannel, PopulationChannel
-from .io import describe_model, list_models, load_yield_table, load_yield_table_hdf5
+from .io import describe_model, list_models, load_yield_table_hdf5
 
 _DATA_DIR = files("crimsons.yields") / "data"
 _STELLAR_YIELDS_H5 = _DATA_DIR / "stellar_yields.h5"
@@ -23,16 +24,90 @@ _STELLAR_YIELDS_H5 = _DATA_DIR / "stellar_yields.h5"
 # grid value, "which rotation velocity" is a real physics choice this
 # library shouldn't make quietly) -- pass model="LC",
 # model_params={"rotation": ...} yourself when you want it.
-DEFAULT_MODELS = {"SNII": "NK", "AGB": "VAN", "PISN": "HW", "SNIa": "Iwamoto"}
+
+
+def _regime_for(metallicity: float | None) -> str | None:
+    """'Population III', 'Population II/I', or None if `metallicity`
+    isn't known -- mirrors the split every bundled YieldTable already
+    makes internally (see yields.base.POPIII_THRESHOLD)."""
+    if metallicity is None:
+        return None
+    return "Population III" if metallicity < POPIII_THRESHOLD else "Population II/I"
+
+
+def _hw_energy_distribution(rng, n):
+    """SNII/HW's tabulated explosion-energy grid (1e51 erg units), drawn
+    uniformly per star -- the default Population III
+    model_params['energy'] (see _REGIME_DEFAULTS)."""
+    energies = [3.0, 6.0, 12.0, 15.0, 18.0, 30.0, 50.0, 100.0]
+    return rng.choice(energies, size=n)
+
+
+def _hw_mixing_distribution(rng, n):
+    """SNII/HW's tabulated mixing-parameter grid, drawn uniformly per
+    star -- the default Population III model_params['mixing'] (see
+    _REGIME_DEFAULTS)."""
+    mixing = [39.8, 63.1, 100.0, 158.5]
+    return rng.choice(mixing, size=n)
+
+
+# Population-appropriate (model, model_params) per channel -- the single
+# source of truth both default_channels(metallicity) and
+# _resolve_model_defaults draw from, so a channel constructed directly
+# with metallicity= (but no model=) always agrees with what
+# default_channels(that same metallicity) would have picked.
+_REGIME_DEFAULTS = {
+    "SNII": {
+        "Population III": (
+            "HW",
+            {"energy": _hw_energy_distribution, "mixing": _hw_mixing_distribution},
+        ),
+        "Population II/I": ("LC", {"rotation": 0}),
+    },
+    "AGB": {
+        "Population III": ("MM", {}),
+        "Population II/I": ("VAN", {}),
+    },
+    "PISN": {
+        # PISN is physically a Population III / extremely metal-poor
+        # phenomenon either way -- HW is used regardless of regime.
+        "Population III": ("HW", {}),
+        "Population II/I": ("HW", {}),
+    },
+    "SNIa": {
+        "Population III": ("Iwamoto", {"model": "W70"}),
+        "Population II/I": ("Iwamoto", {"model": "W7"}),
+    },
+}
+
+
+def _resolve_model_defaults(channel: str, model, model_params, metallicity):
+    """Fill in (model, model_params) for a channel constructor when
+    `model` wasn't given explicitly.
+
+    - `model` given: returned as-is (model_params just copied, untouched).
+    - `model` not given, `metallicity` given: the population-appropriate
+      default from `_REGIME_DEFAULTS`, with any caller-supplied
+      model_params layered on top (caller values win).
+    - neither given: assumes Population II/I and returns the appropriate
+      '_REGIME_DEFAULTS'.
+    """
+    model_params = dict(model_params or {})
+    if model is not None:
+        return model, model_params
+
+    regime = _regime_for(metallicity)
+
+    # fall back to Population II/I if metallicity is not specified
+    if regime is None: regime = "Population II/I"
+
+    default_model, default_params = _REGIME_DEFAULTS[channel][regime]
+    return default_model, {**default_params, **model_params}
 
 
 def _default_yield_table(channel, model, model_params, h5_path):
     h5_path = h5_path or _STELLAR_YIELDS_H5
     return load_yield_table_hdf5(h5_path, channel, model, model_params=model_params)
-
-
-def _default_snia_table():
-    return load_yield_table(_DATA_DIR / "snia_placeholder.csv")
 
 
 def list_available_models(channel: str, h5_path=None) -> list:
@@ -55,6 +130,12 @@ class SNII(MassRangeChannel):
     parameter axes the chosen model has (e.g. LC's rotation velocity) --
     required if that axis has more than one value; see
     describe_available_model('SNII', model).
+
+    If `model` isn't given, pass `metallicity=` to get a population-
+    appropriate default (HW for Population III, LC for Population II/I)
+    with its required model_params already filled in, instead of this
+    library's single metallicity-agnostic default (NK) -- see
+    `default_channels`, which always does this.
     """
 
     def __init__(
@@ -63,17 +144,19 @@ class SNII(MassRangeChannel):
         mass_max: float = 40.0,
         model: str | None = None,
         model_params: dict | None = None,
+        metallicity: float | None = None,
         yield_table=None,
         h5_path=None,
     ):
-        self.model = model or DEFAULT_MODELS["SNII"]
+        self.model, model_params = _resolve_model_defaults("SNII", model, model_params, metallicity)
         table = yield_table or _default_yield_table("SNII", self.model, model_params, h5_path)
         super().__init__("SNII", mass_min, mass_max, table)
 
 
 class AGB(MassRangeChannel):
     """Low/intermediate-mass stars enriching via stellar winds. See SNII
-    for how `model`/`model_params` work."""
+    for how `model`/`model_params`/`metallicity` work (default models:
+    MM for Population III, VAN for Population II/I)."""
 
     def __init__(
         self,
@@ -81,10 +164,11 @@ class AGB(MassRangeChannel):
         mass_max: float = 8.0,
         model: str | None = None,
         model_params: dict | None = None,
+        metallicity: float | None = None,
         yield_table=None,
         h5_path=None,
     ):
-        self.model = model or DEFAULT_MODELS["AGB"]
+        self.model, model_params = _resolve_model_defaults("AGB", model, model_params, metallicity)
         table = yield_table or _default_yield_table("AGB", self.model, model_params, h5_path)
         super().__init__("AGB", mass_min, mass_max, table)
 
@@ -94,7 +178,7 @@ class PISN(MassRangeChannel):
     remnant) of very massive, metal-free/extremely metal-poor stars in a
     narrow mass window -- effectively Population III only. Mass range is
     illustrative; adjust to your models. See SNII for how
-    `model`/`model_params` work.
+    `model`/`model_params`/`metallicity` work.
     """
 
     def __init__(
@@ -103,10 +187,11 @@ class PISN(MassRangeChannel):
         mass_max: float = 260.0,
         model: str | None = None,
         model_params: dict | None = None,
+        metallicity: float | None = None,
         yield_table=None,
         h5_path=None,
     ):
-        self.model = model or DEFAULT_MODELS["PISN"]
+        self.model, model_params = _resolve_model_defaults("PISN", model, model_params, metallicity)
         table = yield_table or _default_yield_table("PISN", self.model, model_params, h5_path)
         super().__init__("PISN", mass_min, mass_max, table)
 
@@ -230,6 +315,7 @@ class SNIa(PopulationChannel):
         mass_max: float = 8.0,
         model: str | None = None,
         model_params: dict | None = None,
+        metallicity: float | None = None,
         h5_path=None,
     ):
         
@@ -245,14 +331,16 @@ class SNIa(PopulationChannel):
                 "(unlike the dtd modes) -- pass the SNIa-per-Msun-formed rate you want"
             )
 
-        # fall back on the default model
-        model = model if model else DEFAULT_MODELS["SNIa"] 
-
-        # Ensure model_params is a dictionary, not None
-        model_params = dict(model_params or {})
+        # fall back on the default model -- population-aware if
+        # metallicity is given (see _resolve_model_defaults), else this
+        # library's single metallicity-agnostic default
+        model, model_params = _resolve_model_defaults("SNIa", model, model_params, metallicity)
 
         if model == "Iwamoto" and "model" not in model_params:
-            model_params["model"] = "W7"
+            # sub-choice among Iwamoto's W7/W70/... deflagration models;
+            # W70 is the Population III-appropriate one (see
+            # _REGIME_DEFAULTS), W7 the metallicity-agnostic default.
+            model_params["model"] = "W70" if _regime_for(metallicity) == "Population III" else "W7"
 
         self.name = "SNIa"
         self.mode = mode
@@ -308,8 +396,42 @@ class SNIa(PopulationChannel):
         return times, one_event_yield * n_events[:, None], n_events
 
 
-def default_channels():
-    """SNII + AGB + SNIa with default models/placeholder SNIa table. Add
-    PISN yourself for Population III / extremely metal-poor runs, e.g.
-    default_channels() + [PISN()]."""
-    return [SNII(), AGB(), SNIa()]
+def default_channels(metallicity):
+    """Population-appropriate SNII + AGB + SNIa (+ PISN for Population
+    III), for `metallicity` (absolute Z).
+
+    Which regime `metallicity` falls in (see
+    `crimsons.chemistry.POPIII_THRESHOLD`) decides both which models are
+    used and, where needed, their model_params -- e.g. SNII's Population
+    III default (HW) needs per-star 'energy'/'mixing' draws that its
+    Population II/I default (LC's 'rotation') doesn't. See
+    `_REGIME_DEFAULTS` for exactly what each regime uses; passing
+    `metallicity=` to SNII/AGB/PISN/SNIa yourself (instead of `model=`)
+    resolves the same way, so a channel list you build by hand can stay
+    consistent with what this function would have picked.
+
+    SN Ia here uses mode='single_burst' with rate_per_msun=0 in both
+    regimes -- i.e. no SN Ia events at all -- as a placeholder until a
+    real rate is calibrated; pass your own SNIa(...) in a hand-built
+    `channels=` list if you want SN Ia actually contributing.
+    """
+    if _regime_for(metallicity) == "Population III":
+        return [
+            PISN(metallicity=metallicity),
+            SNII(mass_min=10.0, mass_max=140.0, metallicity=metallicity),
+            AGB(metallicity=metallicity),
+            SNIa(
+                mode="single_burst",
+                burst_delay_myr=50.0,
+                rate_per_msun=0.0,
+                metallicity=metallicity,
+            ),
+        ]
+    return [
+        SNII(metallicity=metallicity),
+        AGB(metallicity=metallicity),
+        SNIa(
+            mode="dtd",
+            metallicity=metallicity,
+        ),
+    ]
