@@ -499,7 +499,7 @@ class TestIntegrationWithRealSimulation:
         sim = Simulation(
             imf=Kroupa2001(),
             mass_formed=2e5,
-            metallicity=-1.0,
+            metallicity=0.0142,
             n_realizations=4,
             seed=123,
         )

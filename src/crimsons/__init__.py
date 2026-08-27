@@ -4,6 +4,7 @@ from .chemistry import (
     SolarAbundances,
     load_solar_abundances,
     set_default_solar_abundances,
+    z_from_logz,
 )
 from .imf.defaults import default_imf
 from .imf.functional import FunctionalIMF
@@ -43,6 +44,7 @@ __all__ = [
     "list_available_models",
     "load_solar_abundances",
     "set_default_solar_abundances",
+    "z_from_logz",
 ]
 
 __version__ = "0.1.0"

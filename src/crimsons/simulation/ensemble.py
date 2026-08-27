@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from ..chemistry import HDF_COLUMNS, ZSUN
+from ..chemistry import HDF_COLUMNS, ZSUN, check_metallicity
 from ..config import RunConfig
 from ..enrichment.engine import bin_enrichment, run_realization
 from ..imf.defaults import default_imf
@@ -69,11 +69,9 @@ class Simulation:
         # handling metallicity -- resolved before imf/channels below,
         # since both of their metallicity-adaptive defaults need it
         self.zsun = ZSUN
-        self.metallicity_log, self.metallicity_abs = (
-            self._normalize_metallicity(metallicity)
-        )
-        # Standardized attribute expected by downstream lookup tables / lifetime_fn
-        self.metallicity = self.metallicity_abs
+
+        if check_metallicity(metallicity=metallicity):
+            self.metallicity = metallicity
 
         self.imf = imf if imf is not None else default_imf(self.metallicity)
         self.channels = (
@@ -156,25 +154,6 @@ class Simulation:
             result.save(cache_path(cache_dir, cfg))
 
         return result
-
-    def _normalize_metallicity(
-        self, val: float
-    ) -> tuple[float, float]:
-        """Converts input metallicity into canonical (log_z, abs_z) pair.
-
-        - If val <= 0: treated as log10(Z / Z_sun)
-        - If val > 0: treated as absolute metallicity Z
-        """
-        if val <= 0.0:
-            # Input is logarithmic: val = log10(Z / Z_sun)
-            log_z = float(val)
-            abs_z = (10.0**log_z) * self.zsun
-        else:
-            # Input is absolute: val = Z
-            abs_z = float(val)
-            log_z = float(np.log10(abs_z / self.zsun))
-
-        return log_z, abs_z
 
     def _get_progress_bar(self, iterable, verbose: bool):
         """Helper to safely load tqdm or raise a clear error if missing."""

@@ -248,3 +248,27 @@ def set_default_solar_abundances(table) -> None:
     if not isinstance(table, SolarAbundances):
         table = load_solar_abundances(table)
     _default_solar_abundances = table
+
+def z_from_logz(log_z: float, z_sun: float = ZSUN) -> float:
+    """
+    Convert a logarithmic metallicity [Z/Z_sun] into an absolute mass fraction Z.
+    
+    Parameters
+    ----------
+    log_z : float
+        Logarithmic metallicity relative to solar (e.g., -2.0)
+    z_sun : float, optional
+        Solar metallicity reference value. Defaults to crimsons.chemistry.ZSUN.
+    """
+    return z_sun * (10 ** log_z)
+
+def check_metallicity(metallicity):
+    if metallicity <= 0 or metallicity > 1:
+        raise ValueError(
+            f"Invalid metallicity Z={metallicity}. "
+            "CRIMSONS expects absolute mass fractions (0 < Z < 1). "
+            "If you are using a logarithmic value like [Z/Z_sun], "
+            "please convert it first using `crimsons.chemistry.z_from_logz()`."
+        ) 
+    else:
+        return True

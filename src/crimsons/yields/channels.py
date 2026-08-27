@@ -4,7 +4,7 @@ from importlib.resources import files
 
 import numpy as np
 
-from ..chemistry import POPIII_THRESHOLD
+from ..chemistry import POPIII_THRESHOLD, check_metallicity
 from .base import MassRangeChannel, PopulationChannel
 from .io import describe_model, list_models, load_yield_table_hdf5
 
@@ -148,6 +148,7 @@ class SNII(MassRangeChannel):
         yield_table=None,
         h5_path=None,
     ):
+        if metallicity: check_metallicity(metallicity=metallicity)
         self.model, model_params = _resolve_model_defaults("SNII", model, model_params, metallicity)
         table = yield_table or _default_yield_table("SNII", self.model, model_params, h5_path)
         super().__init__("SNII", mass_min, mass_max, table)
@@ -168,6 +169,7 @@ class AGB(MassRangeChannel):
         yield_table=None,
         h5_path=None,
     ):
+        if metallicity: check_metallicity(metallicity=metallicity)
         self.model, model_params = _resolve_model_defaults("AGB", model, model_params, metallicity)
         table = yield_table or _default_yield_table("AGB", self.model, model_params, h5_path)
         super().__init__("AGB", mass_min, mass_max, table)
@@ -191,6 +193,7 @@ class PISN(MassRangeChannel):
         yield_table=None,
         h5_path=None,
     ):
+        if metallicity: check_metallicity(metallicity=metallicity)
         self.model, model_params = _resolve_model_defaults("PISN", model, model_params, metallicity)
         table = yield_table or _default_yield_table("PISN", self.model, model_params, h5_path)
         super().__init__("PISN", mass_min, mass_max, table)
@@ -330,6 +333,9 @@ class SNIa(PopulationChannel):
                 "mode='single_burst' has no literature-default rate_per_msun "
                 "(unlike the dtd modes) -- pass the SNIa-per-Msun-formed rate you want"
             )
+
+        if metallicity: check_metallicity(metallicity=metallicity)
+
 
         # fall back on the default model -- population-aware if
         # metallicity is given (see _resolve_model_defaults), else this

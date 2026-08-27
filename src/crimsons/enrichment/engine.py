@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import numpy as np
 
+from ..chemistry import check_metallicity
 from ..yields.base import PopulationChannel, StochasticYieldTable
 
 
@@ -57,6 +58,9 @@ def run_realization(
     events : list of (channel_name, delay_times, yields) per channel that
         contributed -- yields are already scaled by each bin's count.
     """
+
+    check_metallicity(metallicity=metallicity)
+
 
     bin_masses, bin_counts = imf.sample(
         rng, mass_formed, n_bins=n_bins, chunk_size=chunk_size
