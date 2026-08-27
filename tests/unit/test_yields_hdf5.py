@@ -4,7 +4,7 @@ import h5py
 import numpy as np
 import pytest
 
-from crimsons.chemistry import ELEMENTS, ZSUN
+from crimsons.chemistry import HDF_COLUMNS, ZSUN
 from crimsons.yields.base import MetallicityOutOfRangeWarning
 from crimsons.yields.channels import (
     AGB,
@@ -35,8 +35,8 @@ def test_describe_model_reports_axes_and_grids():
     assert info["metallicity"] == pytest.approx([1.420e-5, 1.420e-4, 1.420e-3,1.420e-2])
     assert info["rotation"] == [0.0, 150.0, 300.0]
     assert info["mass"] == [13,15,20,25,30,40,60,80,120]
-    assert info["elements"] == list(ELEMENTS)
-    assert info["yields_shape"] == (4, 3, 9, 30)
+    assert info["elements"] == list(HDF_COLUMNS)
+    assert info["yields_shape"] == (4, 3, 9, len(HDF_COLUMNS))
 
 
 def test_plain_3d_model_loads_and_matches_grid_point_exactly():
@@ -49,7 +49,8 @@ def test_plain_3d_model_loads_and_matches_grid_point_exactly():
 
     # synth_yield(mass=20, z=0.0, elem_idx=0) = 1e-3*20*1*(1+0)*1.0
     y = table(mass=20.0, metallicity=1e-7)
-    assert y[0, 0] == pytest.approx(8.7742)
+    H_index = HDF_COLUMNS.index('H')
+    assert y[0, H_index] == pytest.approx(8.7742)
 
 
 def test_model_with_one_extra_axis_requires_model_params_when_ambiguous():
@@ -65,7 +66,9 @@ def test_model_with_one_extra_axis_resolves_to_exact_slice():
 
     # synth_yield(mass=25, z=0.0, elem_idx=0, factor=1+300/1000=1.3)
     y = table(mass=25.0, metallicity=ZSUN)
-    assert y[0, 0] == pytest.approx(6.4478000005477645)
+    H_index = HDF_COLUMNS.index('H')
+
+    assert y[0, H_index] == pytest.approx(6.4478000005477645)
 
 
 def test_nearest_rotation_value_is_snapped_not_interpolated():
@@ -82,7 +85,7 @@ def test_model_with_two_extra_axes_resolves_to_exact_slice():
     )
     assert table.model_params == {"energy": 3, "mixing": 0.0}
 
-    c_index = ELEMENTS.index("C")
+    c_index = HDF_COLUMNS.index("C")
     # synth_yield(mass=20, z=0.0, elem_idx=c_index, factor=(1.2/1.2)*(1+0.01*2)=1.02)
     y = table(mass=20.0, metallicity=1e-7)
     expected = 1.869e-10
@@ -155,7 +158,7 @@ def test_channels_construct_with_default_and_explicit_models():
         mask = channel.contributes(np.array([mass]), metallicity=metallicity, rng=None)
         assert mask[0]
         y = channel.yields(np.array([mass]), metallicity=metallicity, rng=None)
-        assert y.shape == (1, len(ELEMENTS))
+        assert y.shape == (1, len(HDF_COLUMNS))
         assert np.all(y >= 0)
         assert channel.mass_min, channel.mass_max == mass_range
 

@@ -19,7 +19,10 @@ ELEMENTS = [
     "Sc", "Ti", "V", "Cr", "Mn", "Fe", "Co", "Ni", "Cu", "Zn",
 ]
 
+HDF_COLUMNS = ["Energy"] + ELEMENTS
+
 assert len(ELEMENTS) == 30
+assert len(HDF_COLUMNS) == 31
 
 ZSUN = 0.0142
 

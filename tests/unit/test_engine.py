@@ -1,6 +1,6 @@
 import numpy as np
 
-from crimsons.chemistry import ELEMENTS, ZSUN
+from crimsons.chemistry import ELEMENTS, HDF_COLUMNS, ZSUN
 from crimsons.enrichment.engine import bin_enrichment, run_realization
 from crimsons.imf.standard import Salpeter1955
 from crimsons.stars.lifetimes import StellarLifetime
@@ -29,9 +29,9 @@ def test_run_realization_smoke():
     assert set(np.unique(fates)) <= {"none", "SNII", "AGB", "SNIa"}
 
     time_grid = np.linspace(0, 13.8, 50)
-    enrichment = bin_enrichment(events, time_grid, len(ELEMENTS))
+    enrichment = bin_enrichment(events, time_grid, len(HDF_COLUMNS))
 
-    assert enrichment.shape == (50, len(ELEMENTS))
+    assert enrichment.shape == (50, len(HDF_COLUMNS))
     assert np.all(enrichment >= 0)
     # cumulative enrichment must be non-decreasing in time
     assert np.all(np.diff(enrichment, axis=0) >= -1e-12)

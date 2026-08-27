@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from ..chemistry import ELEMENTS, ZSUN
+from ..chemistry import ELEMENTS,HDF_COLUMNS, ZSUN
 from ..config import RunConfig
 from ..enrichment.engine import bin_enrichment, run_realization
 from ..io.cache import cache_path, try_load_cache
@@ -103,7 +103,7 @@ class Simulation:
         child_seeds = seed_seq.spawn(self.n_realizations)
 
         all_masses, all_counts, all_fates, all_events = [], [], [], []
-        enrichment = np.zeros((self.n_realizations, len(self.time_grid), len(ELEMENTS)))
+        enrichment = np.zeros((self.n_realizations, len(self.time_grid), len(HDF_COLUMNS)))
 
         # managing of the progress bar
         realization_iterable = self._get_progress_bar(
@@ -128,7 +128,7 @@ class Simulation:
             all_masses.append(bin_masses)
             all_counts.append(bin_counts)
             all_fates.append(fates)
-            enrichment[i] = bin_enrichment(events, self.time_grid, len(ELEMENTS))
+            enrichment[i] = bin_enrichment(events, self.time_grid, len(HDF_COLUMNS))
 
             # remove the yields to save memory, keeping only (name, times, counts)
             memory_safe_events = [(name, times, counts) for name, times, yields, counts in events]
@@ -136,7 +136,7 @@ class Simulation:
         result = EnrichmentResult(
             config=cfg,
             time=self.time_grid,
-            elements=list(ELEMENTS),
+            elements=list(HDF_COLUMNS),
             enrichment=enrichment,
             fates=all_fates,
             masses=all_masses,
