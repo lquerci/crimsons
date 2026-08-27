@@ -7,12 +7,12 @@ from pathlib import Path
 
 import numpy as np
 
-from .chemistry import default_solar_abundances
+from .chemistry import ATOMIC_WEIGHTS, default_solar_abundances
 from .config import RunConfig
 from .io.hdf5 import load_result, save_result
 
 _RATIO_KEY_RE = re.compile(r"^\[\s*([A-Za-z]+)\s*/\s*([A-Za-z]+)\s*\]$")
-
+_NUMBER_RATIO_KEY_RE = re.compile(r"^([A-Za-z]+)\s*/\s*([A-Za-z]+)$")
 
 @dataclass
 class ElementSeries:
@@ -153,10 +153,18 @@ class EnrichmentResult:
                 "EnrichmentResult indices must be an element symbol "
                 f"(e.g. 'Fe') or a bracket ratio (e.g. '[C/Fe]'), not {key!r}"
             )
+        # Check for [X/Y] bracket notation (scaled to solar)
         match = _RATIO_KEY_RE.match(key)
         if match:
             return self._abundance_ratio(match.group(1), match.group(2), label=key)
+
+        # Check for X/Y plain notation (number of atoms ratio)
+        match_number = _NUMBER_RATIO_KEY_RE.match(key)
+        if match_number:
+            return self._number_ratio(match_number.group(1), match_number.group(2), label=key)
+
         return self._element_series(key)
+        
 
     def __contains__(self, key: str) -> bool:
         try:
@@ -186,32 +194,6 @@ class EnrichmentResult:
 
         solar_ratio = default_solar_abundances().ratio(numerator, denominator)
 
-        # add floors
-        num_clamped = np.maximum(1.0e-20, m_num)
-        den_clamped = np.maximum(1.0e-10, m_den)
-
-        # Compute abundance ratio
-        log_ratio = np.log10(num_clamped / den_clamped) - np.log10(solar_ratio)
-
-        #with np.errstate(divide="ignore", invalid="ignore"):
-        #    #ejecta_ratio = np.where((m_num > 0) & (m_den > 0), m_num / m_den, np.nan)
-        #    ejecta_ratio = np.where((m_num > 0) & (m_den > 0), m_num / m_den, 1e-15)
-        #    log_ratio = np.log10(ejecta_ratio)
-
-        # Compute [X/Y] ratio with log terms
-        values = np.where(m_num > 1.0e-20, log_ratio, -15.0)
-        #values = log_ratio - np.log10(solar_ratio)
-
-        # Apply -15.0 floor when element is below threshold
-        #values = np.where(m_num > 1.0e-20, log_ratio, -15.0)
-
-        # Handle Fe == Fe case explicitly (jj == 26 in Fortran)
-        #if numerator == denominator:
-        #    values = np.zeros_like(m_num)
-#
-        return ElementSeries(values, self.time, label=label)
-
-
         with np.errstate(divide="ignore", invalid="ignore"):
             ejecta_ratio = np.where((m_num > 0) & (m_den > 0), m_num / m_den, np.nan)
             log_ratio = np.log10(ejecta_ratio)
@@ -220,6 +202,31 @@ class EnrichmentResult:
         values = log_ratio - np.log10(solar_ratio)
         return ElementSeries(values, self.time, label=label)
 
+    def _number_ratio(self, numerator: str, denominator: str, label: str) -> ElementSeries:
+        """Computes the linear ratio of the number of atoms for two elements."""
+        i_num = self._element_index(numerator)
+        i_den = self._element_index(denominator)
+        
+        m_num = self.enrichment[:, :, i_num]
+        m_den = self.enrichment[:, :, i_den]
+
+        # Fetch atomic weights to convert mass to number of atoms
+        try:
+            m_atomic_num = ATOMIC_WEIGHTS[numerator]
+            m_atomic_den = ATOMIC_WEIGHTS[denominator]
+        except KeyError as e:
+            raise KeyError(f"Atomic mass for {e.args[0]} not found in ATOMIC_MASSES dictionary.") from None
+
+        # N = Mass / Atomic Mass
+        n_num = m_num / m_atomic_num
+        n_den = m_den / m_atomic_den
+
+        with np.errstate(divide="ignore", invalid="ignore"):
+            # Set to NaN where either element hasn't been produced yet to avoid div-by-zero
+            ratio = np.where((n_num > 0) & (n_den > 0), np.log10(n_num / n_den), np.nan)
+
+        return ElementSeries(ratio, self.time, label=label)
+    
     def save(self, path):
         save_result(self, Path(path))
 

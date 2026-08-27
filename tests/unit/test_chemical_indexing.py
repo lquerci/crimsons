@@ -175,15 +175,65 @@ class TestElementAccess:
         with pytest.raises(TypeError):
             simple_result[0]
 
-    def test_slash_without_brackets_is_not_treated_as_a_ratio(self, simple_result):
-        # "C/Fe" (no brackets) must NOT be silently interpreted as a
-        # ratio -- it's an invalid (nonexistent) element symbol.
-        with pytest.raises(KeyError):
-            simple_result["C/Fe"]
+    def test_slash_without_brackets_is_treated_as_number_ratio(self, simple_result):
+        # "C/Fe" (no brackets) should now correctly parse as a number ratio
+        assert simple_result["C/Fe"].label == "C/Fe"
+        assert simple_result["C/Fe"].values.shape == (2, 4)
 
     def test_contains(self, simple_result):
         assert "Fe" in simple_result
         assert "Xx" not in simple_result
+        assert "[C/Fe]" in simple_result
+        assert "C/O" in simple_result
+
+
+# ---------------------------------------------------------------------------
+# Number ratios: result['X/Y'] (linear ratio of atoms)
+# ---------------------------------------------------------------------------
+
+
+class TestNumberRatios:
+    def test_number_ratio_matches_hand_computed_value(self, simple_result):
+        i_c = simple_result.elements.index("C")
+        i_fe = simple_result.elements.index("Fe")
+        m_c = simple_result.enrichment[:, :, i_c]
+        m_fe = simple_result.enrichment[:, :, i_fe]
+        
+        # N_X / N_Y = (M_X / m_X) / (M_Y / m_Y)
+        expected = (m_c / ATOMIC_WEIGHTS["C"]) / (m_fe / ATOMIC_WEIGHTS["Fe"])
+        np.testing.assert_allclose(simple_result["C/Fe"].values, np.log10(expected))
+
+    @pytest.mark.parametrize(
+        "numerator,denominator",
+        [
+            ("C", "Fe"),
+            ("O", "Fe"),
+            ("C", "O"),
+            ("Fe", "O"),
+            ("O", "H"),
+            ("He", "C"),
+        ],
+    )
+    def test_number_ratio_combinations(self, simple_result, numerator, denominator):
+        key = f"{numerator}/{denominator}"
+        i_num = simple_result.elements.index(numerator)
+        i_den = simple_result.elements.index(denominator)
+        m_num = simple_result.enrichment[:, :, i_num]
+        m_den = simple_result.enrichment[:, :, i_den]
+        
+        expected = (m_num / ATOMIC_WEIGHTS[numerator]) / (m_den / ATOMIC_WEIGHTS[denominator])
+        np.testing.assert_allclose(simple_result[key].values, np.log10(expected))
+
+    def test_number_ratio_is_reciprocal(self, simple_result):
+        c_fe = simple_result["C/Fe"].values
+        fe_c = simple_result["Fe/C"].values
+        np.testing.assert_allclose(c_fe, fe_c + 2* c_fe)
+
+    def test_unknown_element_raises_keyerror(self, simple_result):
+        with pytest.raises(KeyError):
+            simple_result["Xx/Fe"]
+        with pytest.raises(KeyError):
+            simple_result["Fe/Xx"]
 
 
 # ---------------------------------------------------------------------------
@@ -266,6 +316,11 @@ class TestNaNHandling:
         assert np.isnan(series.values[:, 0]).all()  # t=0: both realizations Fe=0
         assert np.isnan(series.values[:, 1]).all()  # t=1: both realizations Fe=0
 
+    def test_number_ratio_undefined_before_any_yield_is_nan(self, result_with_delayed_iron):
+        series = result_with_delayed_iron["C/Fe"]
+        assert np.isnan(series.values[:, 0]).all()
+        assert np.isnan(series.values[:, 1]).all()
+
     def test_all_nan_timestep_gives_nan_mean_without_warning(
         self, result_with_delayed_iron
     ):
@@ -288,6 +343,14 @@ class TestNaNHandling:
             warnings.simplefilter("error")
             mean_t2 = series.mean()[2]
         np.testing.assert_allclose(mean_t2, series.values[1, 2])
+        
+    def test_number_ratio_partially_defined_timestep_excludes_nan(
+        self, result_with_delayed_iron
+    ):
+        series = result_with_delayed_iron["C/Fe"]
+        # at t=2: realization 0 has Fe=0 (nan), realization 1 has Fe=0.02 (valid)
+        assert np.isnan(series.values[0, 2])
+        assert not np.isnan(series.values[1, 2])
 
     def test_plain_element_access_never_produces_nan(self, result_with_delayed_iron):
         # a channel legitimately returning zero mass (not yet produced)
@@ -429,8 +492,6 @@ class TestSetDefaultSolarAbundances:
 # Integration: a real (small) Simulation, not a hand-built EnrichmentResult
 # ---------------------------------------------------------------------------
 
-
-@pytest.mark.slow
 class TestIntegrationWithRealSimulation:
     def test_element_and_ratio_access_on_a_real_run(self):
         from crimsons import Kroupa2001, Simulation
@@ -452,8 +513,8 @@ class TestIntegrationWithRealSimulation:
             )
 
         # ratios beyond Fe-as-denominator all come back finite by the
-        # final time step, with the expected shape
-        for key in ["[C/Fe]", "[O/Fe]", "[Mg/Fe]", "[C/O]", "[Fe/O]"]:
+        # final time step, with the expected shape (for [X/Y] and X/Y)
+        for key in ["[C/Fe]", "[O/Fe]", "[Mg/Fe]", "[C/O]", "[Fe/O]", "C/Fe", "O/Mg", "Fe/O"]:
             series = result[key]
             assert series.values.shape == result.enrichment.shape[:2]
             assert np.isfinite(series.mean()[-1])
