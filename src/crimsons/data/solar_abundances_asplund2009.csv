@@ -1,0 +1,45 @@
+# Solar photospheric composition, Table 1 of Asplund, Grevesse, Sauval &
+# Scott (2009), ARA&A 47, 481 ("The Chemical Composition of the Sun").
+#
+# `A` is the standard logarithmic number-abundance scale,
+#     A(El) = log10(N_El / N_H) + 12
+# (so A(H) = 12.00 by definition). He, Ne, and Ar are not measured
+# photospherically (no usable photospheric lines) -- Asplund+09 give
+# indirect values for these from helioseismology / solar-wind / nebular
+# measurements instead; they're included here as-is since only the
+# element-to-element *difference* in A matters for [X/Y] ratios.
+#
+# This is a bundled default, not a project-specific choice -- swap in
+# your own table (e.g. Lodders 2021, or Asplund et al. 2021) with
+# crimsons.chemistry.set_default_solar_abundances(path_or_table).
+element,A
+H,12.00
+He,10.93
+Li,1.05
+Be,1.38
+B,2.70
+C,8.43
+N,7.83
+O,8.69
+F,4.56
+Ne,7.93
+Na,6.24
+Mg,7.60
+Al,6.45
+Si,7.51
+P,5.41
+S,7.12
+Cl,5.50
+Ar,6.40
+K,5.03
+Ca,6.34
+Sc,3.15
+Ti,4.95
+V,3.93
+Cr,5.64
+Mn,5.43
+Fe,7.50
+Co,4.99
+Ni,6.22
+Cu,4.19
+Zn,4.56
