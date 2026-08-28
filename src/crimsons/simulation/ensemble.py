@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from ..chemistry import HDF_COLUMNS, ZSUN, check_metallicity
+from ..chemistry import ELEMENTS, HDF_COLUMNS, ZSUN, check_metallicity
 from ..config import RunConfig
 from ..enrichment.engine import bin_enrichment, run_realization
 from ..imf.defaults import default_imf
@@ -139,11 +139,21 @@ class Simulation:
             # remove the yields to save memory, keeping only (name, times, counts)
             memory_safe_events = [(name, times, counts) for name, times, yields, counts in events]
             all_events.append(memory_safe_events)
+
+        # split the explosion-energy column out of the raw (n_realizations,
+        # n_time, n_elements+1) array bin_enrichment produced -- everything
+        # downstream (EnrichmentResult.elements/enrichment) is chemistry
+        # only, energy is tracked separately (see EnrichmentResult).
+        energy_idx = HDF_COLUMNS.index("Energy")
+        energy = enrichment[:, :, energy_idx]
+        chem_enrichment = np.delete(enrichment, energy_idx, axis=2)
+
         result = EnrichmentResult(
             config=cfg,
             time=self.time_grid,
-            elements=list(HDF_COLUMNS),
-            enrichment=enrichment,
+            elements=list(ELEMENTS),
+            enrichment=chem_enrichment,
+            energy=energy,
             fates=all_fates,
             masses=all_masses,
             counts=all_counts,

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import warnings
 from dataclasses import asdict
 from pathlib import Path
 
@@ -16,6 +17,7 @@ def save_result(result, path: Path):
         f.create_dataset("time", data=result.time)
         f.create_dataset("elements", data=np.array(result.elements, dtype="S"))
         f.create_dataset("enrichment", data=result.enrichment, compression="gzip")
+        f.create_dataset("energy", data=result.energy, compression="gzip")
 
         real_group = f.create_group("realizations")
 
@@ -43,6 +45,20 @@ def load_result(cls, path: Path):
         time = f["time"][:]
         elements = [e.decode() for e in f["elements"][:]]
         enrichment = f["enrichment"][:]
+
+        if "energy" in f:
+            energy = f["energy"][:]
+        else:
+            warnings.warn(
+                f"{path} was saved before explosion-energy tracking was split "
+                "out of EnrichmentResult.elements -- filling `energy` with "
+                "zeros. If this file's `elements` still has 31 entries "
+                "(includes 'Energy'), delete and regenerate it instead of "
+                "relying on this fallback.",
+                UserWarning,
+                stacklevel=2,
+            )
+            energy = np.zeros(enrichment.shape[:2])
 
         n_real = len(f["realizations"])
         masses, counts, fates, events_history = [], [], [], []
@@ -72,6 +88,7 @@ def load_result(cls, path: Path):
         time=time,
         elements=elements,
         enrichment=enrichment,
+        energy=energy,
         fates=fates,
         masses=masses,
         counts=counts,

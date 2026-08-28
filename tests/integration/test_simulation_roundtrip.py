@@ -30,6 +30,10 @@ def test_simulation_runs_and_aggregates():
     assert result.enrichment.shape == (3, 30, len(result.elements))
     assert result.mean().shape == (30, len(result.elements))
     assert result.std().shape == (30, len(result.elements))
+    # explosion energy is tracked separately from the 30 chemical elements
+    assert len(result.elements) == 30
+    assert "explosion_energy" not in result.elements
+    assert result.energy.shape == (3, 30)
 
 
 def test_save_and_load_roundtrip(tmp_path):
@@ -40,6 +44,7 @@ def test_save_and_load_roundtrip(tmp_path):
     loaded = EnrichmentResult.load(path)
 
     np.testing.assert_allclose(loaded.enrichment, result.enrichment)
+    np.testing.assert_allclose(loaded.energy, result.energy)
     assert loaded.elements == result.elements
     assert loaded.config.run_id() == result.config.run_id()
     assert len(loaded.masses) == len(result.masses)

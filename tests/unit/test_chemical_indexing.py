@@ -48,22 +48,31 @@ def _make_config(n_realizations: int) -> RunConfig:
     )
 
 
-def _make_result(enrichment, elements, time=None) -> EnrichmentResult:
+def _make_result(enrichment, elements, time=None, energy=None) -> EnrichmentResult:
     """Build a minimal EnrichmentResult around a hand-picked enrichment
     array, so __getitem__ can be tested without running a full
     Simulation. fates/masses/counts/events_history aren't exercised by
     indexing, so they're left as empty per-realization placeholders.
+
+    `energy` defaults to all-zero (n_realizations, n_time) when not
+    given -- fine for every test that isn't specifically about
+    explosion_energy/Z, since none of those keys touch it.
     """
     enrichment = np.asarray(enrichment, dtype=float)
     n_real, n_time, n_elem = enrichment.shape
     assert n_elem == len(elements)
     if time is None:
         time = np.linspace(1.0, 10.0, n_time)
+    if energy is None:
+        energy = np.zeros((n_real, n_time))
+    else:
+        energy = np.asarray(energy, dtype=float)
     return EnrichmentResult(
         config=_make_config(n_real),
         time=time,
         elements=list(elements),
         enrichment=enrichment,
+        energy=energy,
         fates=[np.array([]) for _ in range(n_real)],
         masses=[np.array([]) for _ in range(n_real)],
         counts=[np.array([]) for _ in range(n_real)],
@@ -489,6 +498,177 @@ class TestSetDefaultSolarAbundances:
 
 
 # ---------------------------------------------------------------------------
+# Explosion energy: result['explosion_energy'], kept separate from chemistry
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def result_with_energy() -> EnrichmentResult:
+    """Same shape as simple_result, plus a non-trivial explosion_energy
+    series -- for exercising result['explosion_energy'] specifically."""
+    elements = ["H", "He", "C", "O", "Fe"]
+    enrichment = np.zeros((2, 4, len(elements)))
+    enrichment[0, :, elements.index("Fe")] = [0.01, 0.02, 0.03, 0.04]
+    enrichment[1, :, elements.index("Fe")] = [0.02, 0.04, 0.06, 0.08]
+    energy = np.array(
+        [
+            [1e51, 2e51, 3e51, 4e51],
+            [0.5e51, 1.5e51, 2.5e51, 3.5e51],
+        ]
+    )
+    return _make_result(enrichment, elements, energy=energy)
+
+
+class TestExplosionEnergy:
+    def test_values_match_the_energy_array(self, result_with_energy):
+        np.testing.assert_allclose(
+            result_with_energy["explosion_energy"].values, result_with_energy.energy
+        )
+
+    def test_mean_matches_manual_mean(self, result_with_energy):
+        np.testing.assert_allclose(
+            result_with_energy["explosion_energy"].mean(),
+            result_with_energy.energy.mean(axis=0),
+        )
+
+    def test_label_is_explosion_energy(self, result_with_energy):
+        assert result_with_energy["explosion_energy"].label == "explosion_energy"
+
+    def test_contains(self, result_with_energy):
+        assert "explosion_energy" in result_with_energy
+
+    def test_not_in_elements(self, result_with_energy):
+        # the whole point of the split -- energy must never show up as a
+        # "chemical element" a caller could stumble into via `elements`
+        assert "explosion_energy" not in result_with_energy.elements
+        assert "Energy" not in result_with_energy.elements
+
+    @pytest.mark.parametrize(
+        "key",
+        [
+            "[explosion_energy/Fe]",
+            "[Fe/explosion_energy]",
+            "explosion_energy/Fe",
+            "Fe/explosion_energy",
+        ],
+    )
+    def test_energy_is_not_usable_as_a_ratio_term(self, result_with_energy, key):
+        # this is the bug being fixed: explosion_energy must never be
+        # treated as a chemical abundance you can build a [X/Y]-style
+        # ratio out of, in either direction or bracket style
+        with pytest.raises(KeyError):
+            result_with_energy[key]
+
+    def test_energy_shape_matches_enrichment_leading_dims(self, result_with_energy):
+        assert result_with_energy.energy.shape == result_with_energy.enrichment.shape[:2]
+
+    def test_mismatched_energy_shape_raises_at_construction(self):
+        with pytest.raises(ValueError, match="energy has shape"):
+            _make_result(
+                np.zeros((2, 4, 3)),
+                ["H", "He", "C"],
+                energy=np.zeros((2, 5)),  # wrong n_time
+            )
+
+    def test_mismatched_elements_enrichment_length_raises_at_construction(self):
+        # general __post_init__ sanity check added alongside the energy
+        # split (not energy-specific), exercised here since it's the
+        # same validation path
+        with pytest.raises(ValueError, match="enrichment has"):
+            EnrichmentResult(
+                config=_make_config(1),
+                time=np.linspace(1.0, 10.0, 4),
+                elements=["H", "He", "C"],
+                enrichment=np.zeros((1, 4, 2)),  # 2 columns, but 3 elements
+                energy=np.zeros((1, 4)),
+                fates=[np.array([])],
+                masses=[np.array([])],
+                counts=[np.array([])],
+                events_history=[[]],
+            )
+
+
+# ---------------------------------------------------------------------------
+# Total metallicity: result['Z'] and result['[Z/Zsun]']
+# ---------------------------------------------------------------------------
+
+
+class TestMetallicity:
+    def test_z_is_the_sum_of_everything_but_h_and_he(self, simple_result):
+        expected = (
+            simple_result["C"].values
+            + simple_result["O"].values
+            + simple_result["Fe"].values
+        )
+        np.testing.assert_allclose(simple_result["Z"].values, expected)
+
+    def test_z_label(self, simple_result):
+        assert simple_result["Z"].label == "Z"
+
+    def test_z_is_never_nan(self, simple_result):
+        # unlike a ratio, a raw summed mass is well-defined everywhere
+        # (zero before any metal enrichment, not undefined)
+        assert not np.isnan(simple_result["Z"].values).any()
+
+    def test_z_is_zero_before_any_metal_enrichment(self):
+        elements = ["H", "He", "C", "Fe"]
+        enrichment = np.zeros((1, 3, len(elements)))
+        enrichment[0, :, elements.index("H")] = [10.0, 10.0, 10.0]
+        enrichment[0, :, elements.index("He")] = [1.0, 1.0, 1.0]
+        enrichment[0, :, elements.index("C")] = [0.0, 0.0, 0.5]
+        enrichment[0, :, elements.index("Fe")] = [0.0, 0.0, 0.1]
+        result = _make_result(enrichment, elements)
+        np.testing.assert_allclose(result["Z"].values[0], [0.0, 0.0, 0.6])
+
+    def test_z_zsun_matches_hand_computed_value(self):
+        elements = ["H", "He", "C", "Fe"]
+        enrichment = np.zeros((1, 1, len(elements)))
+        enrichment[0, 0, elements.index("H")] = 8.0
+        enrichment[0, 0, elements.index("He")] = 1.0
+        enrichment[0, 0, elements.index("C")] = 0.5
+        enrichment[0, 0, elements.index("Fe")] = 0.5
+        result = _make_result(enrichment, elements)
+
+        z_mass = 0.5 + 0.5
+        total_mass = 8.0 + 1.0 + 0.5 + 0.5
+        expected = np.log10(z_mass / total_mass) - np.log10(chem.ZSUN)
+        assert result["[Z/Zsun]"].values[0, 0] == pytest.approx(expected)
+
+    def test_z_zsun_label(self, simple_result):
+        assert simple_result["[Z/Zsun]"].label == "[Z/Zsun]"
+
+    def test_z_zsun_is_not_log_of_raw_z_over_zsun(self, simple_result):
+        # documents the deliberate distinction: result['Z'] is a mass,
+        # while the "Z" inside [Z/Zsun] is a mass *fraction* -- they must
+        # NOT numerically agree (see EnrichmentResult._metallicity_solar_ratio)
+        naive = np.log10(simple_result["Z"].values) - np.log10(chem.ZSUN)
+        assert not np.allclose(simple_result["[Z/Zsun]"].values, naive)
+
+    def test_z_zsun_is_nan_before_any_mass_is_ejected(self):
+        elements = ["H", "He", "C"]
+        enrichment = np.zeros((1, 2, len(elements)))
+        # t=0: nothing ejected at all -> undefined fraction (0/0)
+        # t=1: some H and some C -> a well-defined, nonzero fraction
+        enrichment[0, 1, elements.index("H")] = 1.0
+        enrichment[0, 1, elements.index("C")] = 0.1
+        result = _make_result(enrichment, elements)
+        assert np.isnan(result["[Z/Zsun]"].values[0, 0])
+        assert not np.isnan(result["[Z/Zsun]"].values[0, 1])
+
+    def test_z_combinations_beyond_zsun_are_not_wired_up(self, simple_result):
+        # only 'Z' alone and '[Z/Zsun]' are supported -- this documents
+        # the current limitation (a clear KeyError) rather than silently
+        # misbehaving for e.g. '[Z/Fe]'
+        for key in ("[Z/Fe]", "Z/Zsun", "[Zsun/Z]"):
+            with pytest.raises(KeyError):
+                simple_result[key]
+
+    def test_contains(self, simple_result):
+        assert "Z" in simple_result
+        assert "[Z/Zsun]" in simple_result
+
+
+# ---------------------------------------------------------------------------
 # Integration: a real (small) Simulation, not a hand-built EnrichmentResult
 # ---------------------------------------------------------------------------
 
@@ -518,3 +698,30 @@ class TestIntegrationWithRealSimulation:
             series = result[key]
             assert series.values.shape == result.enrichment.shape[:2]
             assert np.isfinite(series.mean()[-1])
+
+    def test_explosion_energy_and_metallicity_on_a_real_run(self):
+        from crimsons import Kroupa2001, Simulation
+
+        sim = Simulation(
+            imf=Kroupa2001(),
+            mass_formed=2e5,
+            metallicity=0.0142,
+            n_realizations=4,
+            seed=123,
+        )
+        result = sim.run()
+
+        assert "explosion_energy" not in result.elements
+        assert result.energy.shape == result.enrichment.shape[:2]
+        assert np.all(result["explosion_energy"].values >= 0)
+        assert np.isfinite(result["explosion_energy"].mean()[-1])
+
+        expected_z = sum(
+            result[el].values for el in result.elements if el not in ("H", "He")
+        )
+        np.testing.assert_allclose(result["Z"].values, expected_z)
+        assert np.isfinite(result["[Z/Zsun]"].mean()[-1])
+
+        for bad_key in ["[explosion_energy/Fe]", "explosion_energy/Fe", "[Z/Fe]"]:
+            with pytest.raises(KeyError):
+                result[bad_key]
