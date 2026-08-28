@@ -147,3 +147,61 @@ def bin_enrichment(events, time_grid, n_elements):
         idx = np.clip(idx, 0, len(time_grid) - 1)
         np.add.at(increments, idx, yields)
     return np.cumsum(increments, axis=0)
+
+
+def run_and_bin_realization(
+    imf,
+    mass_formed,
+    metallicity,
+    channels,
+    lifetime_fn,
+    time_grid,
+    seed,
+    n_bins: int,
+    chunk_size: int,
+    n_columns: int,
+):
+    """Run one full realization (`run_realization`) and bin it onto
+    `time_grid` (`bin_enrichment`) in a single call -- this is the unit
+    of work `Simulation.run` hands out, whether it's running serially
+    (a plain for loop calling this once per realization) or in parallel
+    (a worker process calling this once per submitted task -- see
+    `crimsons.simulation.ensemble`).
+
+    Doing both steps here, rather than in the caller, keeps a parallel
+    worker's return value small regardless of population size: yields
+    are already reduced to a per-time-bin enrichment array and events
+    have already had their (potentially large) per-star-group yields
+    arrays stripped (keeping only name/times/counts) before anything
+    needs to cross a process boundary -- the same memory-saving trick
+    `Simulation.run` already did in its serial loop.
+
+    `seed` is anything `numpy.random.default_rng` accepts (an int, a
+    `numpy.random.SeedSequence`, ...) rather than a ready-made
+    `Generator`, since a `Generator`'s state doesn't need to (and for a
+    freshly-spawned worker process, can't meaningfully) come from the
+    parent process -- each call gets its own independent stream.
+
+    Returns
+    -------
+    bin_masses, bin_counts, fates : as returned by `run_realization`
+    memory_safe_events : list of (channel_name, times, counts) -- same
+        as `run_realization`'s `events`, minus the yields array
+    enrichment_row : (len(time_grid), n_columns) array, as returned by
+        `bin_enrichment`
+    """
+    rng = np.random.default_rng(seed)
+    bin_masses, bin_counts, fates, events = run_realization(
+        imf,
+        mass_formed,
+        metallicity,
+        channels,
+        lifetime_fn,
+        time_grid,
+        rng,
+        n_bins=n_bins,
+        chunk_size=chunk_size,
+    )
+    enrichment_row = bin_enrichment(events, time_grid, n_columns)
+    memory_safe_events = [(name, times, counts) for name, times, yields, counts in events]
+    return bin_masses, bin_counts, fates, memory_safe_events, enrichment_row

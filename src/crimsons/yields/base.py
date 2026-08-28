@@ -16,9 +16,17 @@ class MetallicityOutOfRangeWarning(UserWarning):
     range -- the nearest available metallicity bin was used instead."""
 
 
-def _regime_lookup(masses, metallicities, yields):
-    """Build a callable(mass, metallicity) -> (n_mass, n_elements) array
-    for ONE population regime's (mass, metallicity) grid.
+class _RegimeInterpolator:
+    """Picklable callable(mass, metallicity) -> (n_mass, n_elements)
+    array for ONE population regime's (mass, metallicity) grid.
+
+    A plain class rather than a closure specifically so YieldTable (and
+    therefore Channel, and therefore Simulation.channels as a whole) can
+    be pickled across a process boundary -- this is what lets
+    Simulation.run(n_jobs=...) hand a channel list to worker processes.
+    A closure returned from a function can't be pickled by the stdlib
+    `pickle` module that `multiprocessing`/`concurrent.futures` use, so
+    this used to be a hard blocker for parallelizing at all.
 
     Mass is always silently clamped to this regime's range. Metallicity
     is also clamped, but *warns* when it has to -- unlike mass, landing
@@ -30,49 +38,58 @@ def _regime_lookup(masses, metallicities, yields):
     metallicity point (e.g. a Population III table computed at Z=0
     only).
     """
-    if len(metallicities) == 1:
-        z_only = metallicities[0]
-        mass_only_yields = yields[:, 0, :]
 
-        def call(mass, metallicity):
-            mass = np.atleast_1d(np.asarray(mass, dtype=float))
-            mass_c = np.clip(mass, masses.min(), masses.max())
-            if not np.isclose(metallicity, z_only):
+    def __init__(self, masses, metallicities, yields):
+        self.masses = masses
+        if len(metallicities) == 1:
+            self._mass_only = True
+            self.z_only = metallicities[0]
+            self.mass_only_yields = yields[:, 0, :]
+        else:
+            self._mass_only = False
+            self.interp = RegularGridInterpolator(
+                (masses, metallicities), yields, bounds_error=False, fill_value=None
+            )
+            self.z_min, self.z_max = metallicities.min(), metallicities.max()
+
+    def __call__(self, mass, metallicity):
+        mass = np.atleast_1d(np.asarray(mass, dtype=float))
+        mass_c = np.clip(mass, self.masses.min(), self.masses.max())
+
+        if self._mass_only:
+            if not np.isclose(metallicity, self.z_only):
                 warnings.warn(
                     f"metallicity {metallicity:.3g} doesn't match this regime's "
-                    f"only tabulated value ({z_only:.3g}) -- using it anyway",
+                    f"only tabulated value ({self.z_only:.3g}) -- using it anyway",
                     MetallicityOutOfRangeWarning,
                     stacklevel=4,
                 )
             return np.stack(
                 [
-                    np.interp(mass_c, masses, mass_only_yields[:, ei])
-                    for ei in range(mass_only_yields.shape[-1])
+                    np.interp(mass_c, self.masses, self.mass_only_yields[:, ei])
+                    for ei in range(self.mass_only_yields.shape[-1])
                 ],
                 axis=-1,
             )
 
-        return call
-
-    interp = RegularGridInterpolator(
-        (masses, metallicities), yields, bounds_error=False, fill_value=None
-    )
-    z_min, z_max = metallicities.min(), metallicities.max()
-
-    def call(mass, metallicity):
-        mass = np.atleast_1d(np.asarray(mass, dtype=float))
-        mass_c = np.clip(mass, masses.min(), masses.max())
-        if metallicity < z_min or metallicity > z_max:
+        if metallicity < self.z_min or metallicity > self.z_max:
             warnings.warn(
                 f"metallicity {metallicity:.3g} is outside this regime's tabulated "
-                f"range [{z_min:.3g}, {z_max:.3g}] -- clamping to the nearest bin",
+                f"range [{self.z_min:.3g}, {self.z_max:.3g}] -- clamping to the nearest bin",
                 MetallicityOutOfRangeWarning,
                 stacklevel=4,
             )
-        z_c = np.clip(np.full(mass.shape, metallicity, dtype=float), z_min, z_max)
-        return interp(np.stack([mass_c, z_c], axis=-1))
+        z_c = np.clip(np.full(mass.shape, metallicity, dtype=float), self.z_min, self.z_max)
+        return self.interp(np.stack([mass_c, z_c], axis=-1))
 
-    return call
+
+def _regime_lookup(masses, metallicities, yields):
+    """Build a callable(mass, metallicity) -> (n_mass, n_elements) array
+    for ONE population regime's (mass, metallicity) grid. See
+    `_RegimeInterpolator` for the actual behavior; this is just a thin
+    factory kept so call sites don't need to change.
+    """
+    return _RegimeInterpolator(masses, metallicities, yields)
 
 
 @dataclass

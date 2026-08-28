@@ -1,10 +1,15 @@
 from __future__ import annotations
 
+import os
+import pickle
+import warnings
+from concurrent.futures import ProcessPoolExecutor, as_completed
+
 import numpy as np
 
 from ..chemistry import ELEMENTS, HDF_COLUMNS, ZSUN, check_metallicity
 from ..config import RunConfig
-from ..enrichment.engine import bin_enrichment, run_realization
+from ..enrichment.engine import run_and_bin_realization
 from ..imf.defaults import default_imf
 from ..io.cache import cache_path, try_load_cache
 from ..results import EnrichmentResult
@@ -33,9 +38,54 @@ class Simulation:
     n_realizations : int
     seed : int or None -- a master seed; each realization gets its own
         independently-spawned child seed (via numpy's SeedSequence), so
-        realizations are reproducible individually and as a set
+        realizations are reproducible individually and as a set --
+        *regardless* of n_jobs (see n_jobs below)
     time_grid : array of times (Myr) at which enrichment is reported
+    n_jobs : int or None, optional -- how many realizations to run at
+        once, in separate worker processes:
+
+        - None (default): auto. Realizations run in parallel only if
+          there's more than one CPU available *and* at least
+          `Simulation.AUTO_PARALLEL_MIN_REALIZATIONS` (4) of them to run
+          -- below that, process-pool startup tends to cost more than
+          serial execution saves. This is a simple realization-count
+          heuristic, not a real profile of your workload: if a handful
+          of realizations is still worth parallelizing for you (e.g. a
+          very large mass_formed and/or n_bins making each one
+          individually expensive), set n_jobs explicitly instead of
+          relying on auto.
+        - 1: force serial (a plain for loop, no multiprocessing at all
+          -- the previous, only, behavior).
+        - -1: use every available CPU.
+        - a positive int: use that many worker processes (capped at
+          n_realizations only -- if you ask for more than the number of
+          CPUs available you'll get a warning, but it's still honored,
+          matching joblib/scikit-learn's n_jobs convention).
+
+        Every realization produces exactly the same result regardless
+        of n_jobs -- it only changes how the work is scheduled, not the
+        physics, so it isn't part of the run's cache identity
+        (`config()`/`RunConfig`): switching n_jobs between runs of an
+        otherwise-identical Simulation still hits the same cache entry.
+
+        Caveats: parallelizing needs `imf`, `channels`, and `lifetime_fn`
+        to be picklable -- true for everything built into this library,
+        but a custom yield distribution, IMF shape function, or channel
+        that uses a lambda or other local closure won't pickle (use a
+        module-level function or a callable class instead). This is
+        checked up front (before spawning any worker), so you get a
+        clear error naming the problem rather than a run half-started.
+        On Windows specifically, using n_jobs != 1 from a script (not a
+        notebook) requires guarding the entry point with
+        `if __name__ == "__main__":`, a standard Python multiprocessing
+        requirement.
+    verbose : bool -- show a progress bar (requires tqdm). Reflects
+        actual completions either way: realizations finishing as they
+        finish when n_jobs > 1, not submission order.
     """
+
+    # see n_jobs above -- the auto heuristic's realization-count cutoff
+    AUTO_PARALLEL_MIN_REALIZATIONS = 4
 
     def __init__(
         self,
@@ -49,6 +99,7 @@ class Simulation:
         time_grid=None,
         n_bins: int = 1000,
         sample_chunk_size: int = 1_000_000,
+        n_jobs: int | None = None,
         verbose : bool = False,
     ):
         self.mass_formed = mass_formed
@@ -59,6 +110,7 @@ class Simulation:
         )
         self.n_bins = n_bins
         self.sample_chunk_size = sample_chunk_size
+        self.n_jobs = n_jobs
         self.verbose = verbose
 
         # Fallback to standard defaults if not explicitly provided
@@ -97,6 +149,54 @@ class Simulation:
             n_bins= int(self.n_bins)
         )
 
+    def _resolve_n_workers(self) -> int:
+        """How many worker processes `run()` should actually use --
+        1 means "just use a plain for loop", including whenever the
+        n_jobs=None auto heuristic decides against parallelizing. See
+        the n_jobs parameter docs on the class for what each setting
+        means.
+        """
+        cpu_count = os.cpu_count() or 1
+
+        if self.n_jobs is None:
+            if cpu_count > 1 and self.n_realizations >= self.AUTO_PARALLEL_MIN_REALIZATIONS:
+                return min(self.n_realizations, cpu_count)
+            return 1
+
+        if self.n_jobs == -1:
+            return min(self.n_realizations, cpu_count)
+
+        if self.n_jobs < 1:
+            raise ValueError(f"n_jobs must be a positive int, -1, or None, got {self.n_jobs!r}")
+
+        if self.n_jobs > cpu_count:
+            warnings.warn(
+                f"n_jobs={self.n_jobs} is more than the {cpu_count} CPU(s) "
+                "available on this machine -- using that many worker "
+                "processes anyway, but you likely won't see speedup past "
+                "cpu_count workers",
+                stacklevel=3,
+            )
+        return min(self.n_jobs, self.n_realizations)
+
+    def _check_picklable_for_parallel_run(self):
+        """Fail fast with a clear error if imf/channels/lifetime_fn can't
+        be pickled, rather than a confusing traceback from deep inside
+        concurrent.futures after a worker process has already been
+        spawned."""
+        try:
+            pickle.dumps((self.imf, self.channels, self.lifetime_fn))
+        except (pickle.PicklingError, AttributeError, TypeError) as exc:
+            raise pickle.PicklingError(
+                "Simulation.imf/channels/lifetime_fn must be picklable to use "
+                "n_jobs != 1 (parallel realizations run in separate worker "
+                "processes). A custom yield distribution, IMF shape function, "
+                "or channel that uses a lambda or other local closure won't "
+                "pickle -- use a module-level function or a callable class "
+                f"instead. Set n_jobs=1 to run serially without this "
+                f"restriction. Original error: {exc}"
+            ) from exc
+
     def run(self, cache_dir=None, overwrite: bool = False) -> EnrichmentResult:
         cfg = self.config()
 
@@ -107,38 +207,18 @@ class Simulation:
 
         seed_seq = np.random.SeedSequence(self.seed)
         child_seeds = seed_seq.spawn(self.n_realizations)
+        n_columns = len(HDF_COLUMNS)
 
-        all_masses, all_counts, all_fates, all_events = [], [], [], []
-        enrichment = np.zeros((self.n_realizations, len(self.time_grid), len(HDF_COLUMNS)))
-
-        # managing of the progress bar
-        realization_iterable = self._get_progress_bar(
-                range(len(child_seeds)), verbose=self.verbose
+        n_workers = self._resolve_n_workers()
+        if n_workers > 1:
+            self._check_picklable_for_parallel_run()
+            all_masses, all_counts, all_fates, all_events, enrichment = self._run_parallel(
+                child_seeds, n_columns, n_workers
             )
-
-        for i in realization_iterable:
-            child_seed = child_seeds[i]
-            rng = np.random.default_rng(child_seed)
-
-            bin_masses, bin_counts, fates, events = run_realization(
-                self.imf,
-                self.mass_formed,
-                self.metallicity,
-                self.channels,
-                self.lifetime_fn,
-                self.time_grid,
-                rng,
-                n_bins=self.n_bins,
-                chunk_size=self.sample_chunk_size,
+        else:
+            all_masses, all_counts, all_fates, all_events, enrichment = self._run_serial(
+                child_seeds, n_columns
             )
-            all_masses.append(bin_masses)
-            all_counts.append(bin_counts)
-            all_fates.append(fates)
-            enrichment[i] = bin_enrichment(events, self.time_grid, len(HDF_COLUMNS))
-
-            # remove the yields to save memory, keeping only (name, times, counts)
-            memory_safe_events = [(name, times, counts) for name, times, yields, counts in events]
-            all_events.append(memory_safe_events)
 
         # split the explosion-energy column out of the raw (n_realizations,
         # n_time, n_elements+1) array bin_enrichment produced -- everything
@@ -165,7 +245,89 @@ class Simulation:
 
         return result
 
-    def _get_progress_bar(self, iterable, verbose: bool):
+    def _run_serial(self, child_seeds, n_columns):
+        """Plain for-loop realization path -- used when n_jobs resolves
+        to 1 (explicitly, or via the n_jobs=None auto heuristic)."""
+        all_masses, all_counts, all_fates, all_events = [], [], [], []
+        enrichment = np.zeros((self.n_realizations, len(self.time_grid), n_columns))
+
+        realization_iterable = self._get_progress_bar(
+            range(self.n_realizations), verbose=self.verbose
+        )
+
+        for i in realization_iterable:
+            bin_masses, bin_counts, fates, memory_safe_events, enrichment_row = (
+                run_and_bin_realization(
+                    self.imf,
+                    self.mass_formed,
+                    self.metallicity,
+                    self.channels,
+                    self.lifetime_fn,
+                    self.time_grid,
+                    child_seeds[i],
+                    n_bins=self.n_bins,
+                    chunk_size=self.sample_chunk_size,
+                    n_columns=n_columns,
+                )
+            )
+            all_masses.append(bin_masses)
+            all_counts.append(bin_counts)
+            all_fates.append(fates)
+            all_events.append(memory_safe_events)
+            enrichment[i] = enrichment_row
+
+        return all_masses, all_counts, all_fates, all_events, enrichment
+
+    def _run_parallel(self, child_seeds, n_columns, n_workers):
+        """Realizations dispatched to `n_workers` worker processes, each
+        running run_and_bin_realization for one realization -- see the
+        n_jobs parameter docs on the class. Results are collected as
+        each realization actually finishes (not submission order), so
+        the progress bar (verbose=True) reflects real completions."""
+        all_masses = [None] * self.n_realizations
+        all_counts = [None] * self.n_realizations
+        all_fates = [None] * self.n_realizations
+        all_events = [None] * self.n_realizations
+        enrichment = np.zeros((self.n_realizations, len(self.time_grid), n_columns))
+
+        with ProcessPoolExecutor(max_workers=n_workers) as executor:
+            future_to_index = {
+                executor.submit(
+                    run_and_bin_realization,
+                    self.imf,
+                    self.mass_formed,
+                    self.metallicity,
+                    self.channels,
+                    self.lifetime_fn,
+                    self.time_grid,
+                    child_seeds[i],
+                    self.n_bins,
+                    self.sample_chunk_size,
+                    n_columns,
+                ): i
+                for i in range(self.n_realizations)
+            }
+
+            completed = self._get_progress_bar(
+                as_completed(future_to_index),
+                verbose=self.verbose,
+                total=self.n_realizations,
+            )
+
+            for future in completed:
+                i = future_to_index[future]
+                bin_masses, bin_counts, fates, memory_safe_events, enrichment_row = (
+                    future.result()
+                )
+                all_masses[i] = bin_masses
+                all_counts[i] = bin_counts
+                all_fates[i] = fates
+                all_events[i] = memory_safe_events
+                enrichment[i] = enrichment_row
+
+        return all_masses, all_counts, all_fates, all_events, enrichment
+
+    def _get_progress_bar(self, iterable, verbose: bool, total: int | None = None):
         """Helper to safely load tqdm or raise a clear error if missing."""
         if not verbose:
             return iterable
@@ -178,6 +340,7 @@ class Simulation:
                 desc="[CRIMSONS] Simulating",
                 unit="realization",
                 leave=True,
+                total=total,
             )
         except ImportError:
             raise ImportError(
