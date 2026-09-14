@@ -112,6 +112,9 @@ See [Enrichment Channels](../physics/channels.md) for the DTD formulas and
 
 ## Using your own yield tables
 
+!!! warning "CHECK THE load CSV function"
+    we might have to check the presene of `load_csv_function` and in case describe briefely the expected shape for the yields 
+
 Bypass the bundled HDF5 file entirely by passing `yield_table=` (a
 [`YieldTable`][crimsons.yields.base.YieldTable] or
 [`StochasticYieldTable`][crimsons.yields.base.StochasticYieldTable]) or

@@ -1,67 +1,31 @@
 ---
 title: CRIMSONS
-description: Chemical Evolution Yield & IMF Stochastic Engine
+description: Chemical Enrichment & IMF Stochastic Engine
 ---
 
 # CRIMSONS
 
-Chemical Evolution Yield & IMF Stochastic Engine
+Welcome to the CRIMSONS documentation! 
 
-CRIMSONS is a Python engine for stochastic chemical-enrichment simulations of
-stellar populations: sample an initial mass function, evolve it through
-core-collapse supernovae, AGB winds, Type Ia supernovae and (optionally)
-pair-instability supernovae, and get back the time-resolved abundances of 30
-elements released to the interstellar medium.
 
-!!! warning "Bundled yield tables are placeholders"
-    The `stellar_yields.h5` file shipped with this package is
-    **synthetically generated**, not real published nucleosynthesis data --
-    see [Selecting Yield Models](examples/yield-models.md) for how to point
-    CRIMSONS at your own tables before using it for science.
+!!! warning "Current status: under development"
+    This Python package is currently under development. It will be ready when the publication paper will be posted on arxiv. You can already read the documentation and try install it from source, but please bear in mind that things might be unstable and untested. Thanks for your patience.      
 
-## What it does
 
-- **Sample an IMF stochastically.** Draw a stellar population up to a target
-  formed mass, binned in log-mass rather than star-by-star, so a single
-  realization stays fast even at $10^6\,M_\odot$ and above.
-- **Evolve it through multiple enrichment channels.** SNII and AGB are
-  triggered by initial mass; SNIa is driven by a delay-time distribution (or
-  a single-burst approximation) over the population as a whole; PISN covers
-  the (typically Population III) pair-instability window.
-- **Track metallicity- and population-dependent physics.** Stellar
-  lifetimes, IMF mass ranges, and yield-table lookups all branch between
-  Population III and Population II/I regimes at a configurable metallicity
-  threshold.
-- **Run an ensemble, not a single draw.** `Simulation` runs $N$ independent,
-  reproducibly-seeded realizations and reports the mean and scatter across
-  them -- the "stochastic" in the name.
-- **Cache and persist results.** Every run's configuration hashes to a
-  stable ID; results round-trip to HDF5 so repeated runs of the same
-  configuration are free.
+CRIMSONS is a tool for modelling the chemical enrichment end energy feedback from a single stellar population of Population III or Population II/I stars. It performs a stochastic sampling of the Initial Mass Function (IMF) and evolves the individual stars with four chemical enrichment channels: Supernovae type II (SNII) and Ia (SNIa), Asymptotic Giant Branch (AGB), and pair instability supernovae (PISN). The tool is distributed in two forms: an online tool version and a Python package. The two version serve two different porpuses. The online tool is a ready-to-use web-based tool that can be used to compare predicted chemical abundances with observations. The Python package instead is suited for parameter space exploration.     
 
-## A 30-second example
+This is the documentation page for the Python version, the online tool version can be found at [CRIMSONS tool](https://martina-rossi.it/crimsons.html){: target="_blank" }
 
-```python
-from crimsons import Kroupa2001, Simulation
 
-imf = Kroupa2001()
 
-sim = Simulation(
-    imf=imf,
-    mass_formed=1e6,      # Msun of stars formed in this population
-    metallicity=-1.0,     # log10(Z / Zsun) = -1
-    n_realizations=20,
-    seed=42,
-)
+## Beforfe starting 
 
-result = sim.run()
-mean_enrichment = result.mean()  # shape (n_time, n_elements)
-```
+CRIMSONS enables a high level of customization of the chemical enrichment enabling the change of the IMF, of enrichment channels, stellar lifetime, and return yields. At the same time, it also possible to run CRIMOSNS with as few as three parameters. In the latter case the code adopts a fiducial set of parameters based on the metallicity and described in Rossi et al. 2026. Please read the [physics](physics/index.md) for a description of the fiducial parameters and the already implemented different options. Examples of code customization can be found in [examples](examples/basic-simulation.md). 
 
 Head to [Getting Started](getting-started/installation.md) for the full
 walkthrough, or straight to [Examples](examples/basic-simulation.md) for more
 worked scenarios.
-
+ 
 ## Where to go next
 
 <div class="grid cards" markdown>
@@ -73,6 +37,7 @@ worked scenarios.
     Install CRIMSONS and run your first simulation in a few minutes.
 
     [:octicons-arrow-right-24: Installation](getting-started/installation.md)
+    [:octicons-arrow-right-24: Quick start](getting-started/quickstart.md)
 
 - :material-flask-outline:{ .lg .middle } **Examples**
 
@@ -81,6 +46,8 @@ worked scenarios.
     Worked examples: custom IMF shapes, yield-model selection, caching.
 
     [:octicons-arrow-right-24: Basic simulation](examples/basic-simulation.md)
+    [:octicons-arrow-right-24: Custom IMF](examples/customs-imf.md)
+    [:octicons-arrow-right-24: Yileds Models](examples/yield-models.md)
 
 - :material-atom:{ .lg .middle } **Physics**
 
@@ -102,9 +69,8 @@ worked scenarios.
 
 ## Citing
 
-If CRIMSONS contributes to a publication, please cite the repository (add
-your Zenodo DOI / paper reference here once available) and cite the
+If CRIMSONS contributes to a publication, please consider citing the 
+presentation paper (addpaper reference here once available) and cite the
 literature sources for whichever yield tables and IMF/lifetime
 prescriptions you actually used -- see [Physics](physics/index.md) and
-[Selecting Yield Models](examples/yield-models.md) for the references baked
-into each default.
+[Selecting Yield Models](examples/yield-models.md) for the references.

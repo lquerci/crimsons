@@ -12,11 +12,13 @@ from crimsons import Kroupa2001
 imf = Kroupa2001()
 ```
 
-`Kroupa2001()`, `Salpeter1955()`, and `FunctionalIMF(...)` (for an
-arbitrary custom shape -- see
-[Custom IMF Shapes](../examples/custom-imf.md)) are the built-in options.
-You don't need to set a mass range here: if you don't pass `m_min`/`m_max`
-explicitly, the IMF resolves a metallicity-appropriate default range once
+`Kroupa2001()`, `Salpeter1955()`, and `Chabrier2003()` are the built-in options. For the full 
+list of IMFs see [Initial Mass Function](../physics/imf.md). It is also possible to pass an 
+arbitrary custom IMF shape with `FunctionalIMF(...)`,  see
+[Custom IMF Shapes](../examples/custom-imf.md). 
+
+If the IMF is not  specified, CRIMSONS defaults to `Chabrier2003()`, with `m_ch = 0.35` or  `10` based on metallicity.
+Similarly, if no `m_min`/`m_max` is passed explicitly, the IMF resolves a metallicity-appropriate default range once
 it knows the run's metallicity (see step 2, and
 [Metallicity & Population III](../physics/metallicity.md)).
 
@@ -28,21 +30,22 @@ from crimsons import Simulation
 sim = Simulation(
     imf=imf,
     mass_formed=1e6,       # Msun of stars formed, per realization
-    metallicity=-1.0,      # see convention below
+    metallicity=0.00142,   # absolute metallicity 
     n_realizations=20,     # independent Monte Carlo realizations
     seed=42,               # reproducible: each realization gets its own child seed
 )
 ```
 
-**Metallicity convention:** pass `metallicity <= 0` for `log10(Z / Zsun)`,
-or `metallicity > 0` for absolute `Z`. `metallicity=-1.0` above means
-`Z = 0.1 * Zsun`; `metallicity=0.02` would mean absolute `Z = 0.02`. Both
-forms are always available on the result via `result.config.metallicity`
-(stored as absolute `Z`).
+**Metallicity convention:** the passed metallicity, $Z$, is expected to be absolute. The assumed solar metallicity in CRIMSONS is $Z_\odot = 0.0142$ (Asplund et al., 2009), therefore the value in the example corresponds to $\log(Z/Z_\odot) = -1$. You can convert $\log(Z/Z_\odot) = -1$ to $Z$ using the `z_from_logz()` function. 
 
-If you don't pass `lifetime_fn` or `channels`, `Simulation` defaults to
-`StellarLifetime()` and `default_channels()` (SNII + AGB + SNIa -- add
-`PISN()` yourself for Population III / extremely metal-poor runs).
+```python
+from crimsons import z_from_logz
+
+absolute_metallicity = z_from_logz(-1)
+
+```
+
+The metallicity distinguishes between Pop III and Pop II single stellar populations with the threshold value set to $Z_{crit} = 10^{-4.5} Z_\odot$. Once the metallicity is specified, all parameters defaults to the fiducial parameters of Rossi et al., 2026. Additionally, if you don't pass `lifetime_fn`, CRIMSONS default is `StellarLifetime()` which uses Raitieri+97 and Schaerer 2002 for stellar lifetimes of PopII and PopIII, respectively.  Similarly, you can specify the chemical enrichment channels passing `channels` as arguments, otherwise CRIMSONS uses `default_channels()` which are: Supernovae type II (SNII), type Ia (SNIa), and Asymptiotic Giant Branch (AGB), for Pop II and PopIII, with the addition of Pair-instability SNe (PISN) for the latter.
 
 ## 3. Run it
 
@@ -55,8 +58,7 @@ population from the IMF, evolves it through every configured channel, and
 accumulates enrichment onto a shared time grid (`Myr`, log-spaced from 1
 to 10,000 by default -- pass `time_grid=` to `Simulation` to override).
 
-Want a progress bar for long runs? Pass `verbose=True` (requires
-`pip install tqdm`).
+Want a progress bar for long runs? Pass `verbose=True` as `Simulation` argument.
 
 ## 4. Read the result
 
@@ -84,22 +86,25 @@ from crimsons import EnrichmentResult
 loaded = EnrichmentResult.load("my_run.h5")
 ```
 
-Or let `Simulation` manage this for you via `run(cache_dir=...)` -- see
+Or let `Setup` manage this for you via `run(cache_dir=...)` -- see
 [Caching & Persistence](../examples/caching-results.md).
 
 ## Full example
 
+The following is an example of computin the mean iron enrichemnt from a Pop II single stellar population considering the enrichment from SNII and AGB only.  
+
 ```python
 import numpy as np
-from crimsons import Kroupa2001, Simulation
+from crimsons import Kroupa2001, Setup, SNII, AGB
 
 imf = Kroupa2001()
-sim = Simulation(
+sim = Setup(
     imf=imf,
-    mass_formed=1e6,
-    metallicity=-1.0,
+    mass_formed=1e4,
+    metallicity=0.0142,
     n_realizations=20,
     seed=42,
+    channels=[SNII(), AGB()]
 )
 result = sim.run()
 
@@ -108,5 +113,5 @@ i_fe = result.elements.index("Fe")
 print("Final mean Fe returned to the ISM:", mean[-1, i_fe], "Msun")
 ```
 
-Next: [worked examples](../examples/basic-simulation.md), or the
+Next: [worked examples](../examples/basic-setup.md), or the
 [physics](../physics/index.md) behind each piece.

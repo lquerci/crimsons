@@ -1,7 +1,8 @@
 # Custom IMF Shapes
 
-The built-in `Salpeter1955` and `Kroupa2001` are exact, fast
-implementations of broken power laws. For anything else -- log-normal
+The built-in options for the IMF are `Salpeter1955`, `Kroupa2001`, `Chabrier2003`, `Flat`.  
+`Salpeter1955`, `Kroupa2001` and `Flat` are exact, fast
+implementations of [broken power laws](../physics/imf.md#broken-power-laws). `Chabrier2003` is implemented using the `FunctionalIMF`[`FunctionalIMF`][crimsons.imf.functional.FunctionalIMF], which computes the .   For anything else -- log-normal
 forms (Chabrier-style), tapered (Larson-style) forms, top-heavy
 Population III shapes, or a shape lifted straight from a paper --
 use [`FunctionalIMF`][crimsons.imf.functional.FunctionalIMF].
