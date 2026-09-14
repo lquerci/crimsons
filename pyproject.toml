@@ -14,6 +14,7 @@ dependencies = [
     "numpy>=1.24",
     "scipy>=1.10",
     "h5py>=3.8",
+    "tqdm>=4.70"
 ]
 classifiers = [
     "Programming Language :: Python :: 3",
@@ -27,7 +28,6 @@ classifiers = [
 dev = ["pytest>=7.0", "ruff"]
 plot = ["matplotlib"]
 parallel = ["joblib"]
-verbose = ["tqdm"]
 docs = [
     "mkdocs>=1.5",
     "mkdocs-material>=9.5",
