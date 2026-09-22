@@ -9,7 +9,8 @@ Welcome to the CRIMSONS documentation!
 
 
 !!! warning "Current status: under development"
-    This Python package is currently under development. It will be ready when the publication paper will be posted on arxiv. You can already read the documentation and try install it from source, but please bear in mind that things might be unstable and untested. Thanks for your patience.      
+    This Python package is currently under development. 
+    You can already read the documentation and try install it from source, but please bear in mind that things might be unstable and untested. A more stable version of CRIMSONS can be found as web-based version of the [CRIMSONS tool](https://martina-rossi.it/crimsons.html){: target="_blank" }. Thanks for your patience. 
 
 
 CRIMSONS is a tool for modelling the chemical enrichment and energy feedback from a single stellar population of Population III or Population II/I stars. It performs a stochastic sampling of the Initial Mass Function (IMF) and evolves the individual stars with four chemical enrichment channels: Supernovae type II (SNII) and Ia (SNIa), Asymptotic Giant Branch (AGB), and pair instability supernovae (PISN). The tool is distributed in two forms: an online tool version  that can be found at [CRIMSONS tool](https://martina-rossi.it/crimsons.html){: target="_blank" } and a Python package. This is the documentation page for the Python package.
