@@ -2,7 +2,8 @@
 
 A complete run: sample a Kroupa IMF, evolve it through the default
 channels, and plot the mean enrichment history with its realization-to-
-realization scatter.
+realization scatter. For what each piece of this run actually does and
+how to change it, see [Customize](../customize/index.md).
 
 ```python
 import matplotlib.pyplot as plt
@@ -76,5 +77,6 @@ sim = Simulation(
 )
 ```
 
-Next: [custom IMF shapes](custom-imf.md), or
-[selecting yield models](yield-models.md).
+Next: [custom IMF shapes](custom-imf.md), [selecting yield models](yield-models.md),
+or -- for a nicer way to pull `result.mean()` apart by element than the
+manual indexing above -- [Output Interaction](output-interaction.md).

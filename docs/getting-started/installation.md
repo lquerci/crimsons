@@ -19,9 +19,6 @@ You can install CRIMSONS via `pip`
 pip install crimsons
 ```
 
-!!! note
-    The project hasn't been published to PyPI yet-- update this page once it has.
-
 ## Install from source
 
 It is also possible to install from source

@@ -4,10 +4,11 @@ A star's main-sequence(-ish) lifetime sets *when* its channel's enrichment
 reaches the ISM (for mass-triggered channels -- see
 [Enrichment Channels](channels.md)) and bounds the delay-time distribution
 for SN Ia. `StellarLifetime` (the default `lifetime_fn` for `Simulation`)
-implements a two-source, mass-and-metallicity-dependent fit, ported from a
-Fortran chemical-evolution code.
+implements a two-source, mass-and-metallicity-dependent fit.
 
-## Population II/I: Raiteri et al. (1996)
+## What it is
+
+### Population II/I: Raiteri et al. (1996)
 
 For metallicity above the Population III threshold (see
 [Metallicity & Population III](metallicity.md)), lifetime is a
@@ -32,7 +33,7 @@ before taking its log (matching the range the original fit was calibrated
 over) -- values outside that range use the coefficients at the nearest
 boundary rather than extrapolating the quadratic.
 
-## Population III: Raiteri (1996) + Schaerer (2002)
+### Population III: Raiteri (1996) + Schaerer (2002)
 
 Below the Population III threshold, the single Raiteri+1996 fit is
 replaced by a piecewise combination, split by mass:
@@ -50,13 +51,15 @@ The middle branch is the Schaerer (2002) fit for very massive,
 metal-free-ish stars; above $500\,M_\odot$ it's held flat at the
 $500\,M_\odot$ value rather than extrapolated.
 
-## Units
+### Units
 
 Internally the fits are evaluated in years and then converted to **Myr**
 (the unit `StellarLifetime.__call__` returns, and the unit CRIMSONS'
 `time_grid` and delay times are expressed in throughout).
 
-## Plugging in your own fit
+## Customizing
+
+### Plugging in your own fit
 
 `lifetime_fn` just needs to be a callable
 `(mass: np.ndarray, metallicity: float) -> np.ndarray` (in Myr, vectorized
@@ -64,3 +67,17 @@ over mass) -- subclass
 [`LifetimeFunction`][crimsons.stars.lifetimes.LifetimeFunction] to plug in
 whatever fit you need (e.g. Padovani & Matteucci 1993, or your own
 isochrone-based table), and pass it as `Simulation(..., lifetime_fn=...)`.
+
+```python
+from crimsons.stars.lifetimes import LifetimeFunction
+
+class MyLifetimeFunction(LifetimeFunction):
+    def __call__(self, mass, metallicity):
+        ...  # return an array of lifetimes in Myr, same shape as `mass`
+
+sim = Simulation(..., lifetime_fn=MyLifetimeFunction())
+```
+
+Nothing downstream (channels, the SN Ia delay-time distribution) needs to
+know a custom fit is in use -- everything that needs a lifetime calls
+`lifetime_fn(mass, metallicity)` uniformly.

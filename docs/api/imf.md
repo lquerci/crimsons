@@ -2,7 +2,7 @@
 
 Base class, exact broken-power-law implementations, and a general
 numerical implementation for arbitrary shapes. See
-[Physics: Initial Mass Function](../physics/imf.md) for the underlying
+[Customize: Initial Mass Function](../customize/imf.md) for the underlying
 model and [Custom IMF Shapes](../examples/custom-imf.md) for usage
 examples.
 

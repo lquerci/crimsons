@@ -12,15 +12,13 @@ Welcome to the CRIMSONS documentation!
     This Python package is currently under development. It will be ready when the publication paper will be posted on arxiv. You can already read the documentation and try install it from source, but please bear in mind that things might be unstable and untested. Thanks for your patience.      
 
 
-CRIMSONS is a tool for modelling the chemical enrichment end energy feedback from a single stellar population of Population III or Population II/I stars. It performs a stochastic sampling of the Initial Mass Function (IMF) and evolves the individual stars with four chemical enrichment channels: Supernovae type II (SNII) and Ia (SNIa), Asymptotic Giant Branch (AGB), and pair instability supernovae (PISN). The tool is distributed in two forms: an online tool version and a Python package. The two version serve two different porpuses. The online tool is a ready-to-use web-based tool that can be used to compare predicted chemical abundances with observations. The Python package instead is suited for parameter space exploration.     
-
-This is the documentation page for the Python version, the online tool version can be found at [CRIMSONS tool](https://martina-rossi.it/crimsons.html){: target="_blank" }
+CRIMSONS is a tool for modelling the chemical enrichment and energy feedback from a single stellar population of Population III or Population II/I stars. It performs a stochastic sampling of the Initial Mass Function (IMF) and evolves the individual stars with four chemical enrichment channels: Supernovae type II (SNII) and Ia (SNIa), Asymptotic Giant Branch (AGB), and pair instability supernovae (PISN). The tool is distributed in two forms: an online tool version  that can be found at [CRIMSONS tool](https://martina-rossi.it/crimsons.html){: target="_blank" } and a Python package. This is the documentation page for the Python package.
 
 
 
-## Beforfe starting 
+## Before starting
 
-CRIMSONS enables a high level of customization of the chemical enrichment enabling the change of the IMF, of enrichment channels, stellar lifetime, and return yields. At the same time, it also possible to run CRIMOSNS with as few as three parameters. In the latter case the code adopts a fiducial set of parameters based on the metallicity and described in Rossi et al. 2026. Please read the [physics](physics/index.md) for a description of the fiducial parameters and the already implemented different options. Examples of code customization can be found in [examples](examples/basic-simulation.md). 
+CRIMSONS enables a high level of customization of the chemical enrichment, allowing modifications in the IMF form and shape, the enrichment channels, the stellar lifetime prescription, and the return yields. At the same time, it's also possible to run CRIMSONS with as few as three parameters. In the latter case, the code adopts a fiducial set of parameters based on the metallicity, described in Rossi et al. 2026. See [Customize](customize/index.md) for a description of the fiducial parameters and every option available to change them, and [Examples](examples/basic-simulation.md) for worked customizations.
 
 Head to [Getting Started](getting-started/installation.md) for the full
 walkthrough, or straight to [Examples](examples/basic-simulation.md) for more
@@ -43,19 +41,21 @@ worked scenarios.
 
     ---
 
-    Worked examples: custom IMF shapes, yield-model selection, caching.
+    Worked examples: custom IMF shapes, yield-model selection, reading
+    results, caching.
 
     [:octicons-arrow-right-24: Basic simulation](examples/basic-simulation.md)
-    [:octicons-arrow-right-24: Custom IMF](examples/customs-imf.md)
-    [:octicons-arrow-right-24: Yileds Models](examples/yield-models.md)
+    [:octicons-arrow-right-24: Custom IMF](examples/custom-imf.md)
+    [:octicons-arrow-right-24: Yield models](examples/yield-models.md)
 
-- :material-atom:{ .lg .middle } **Physics**
+- :material-atom:{ .lg .middle } **Customize**
 
     ---
 
-    The IMF, lifetime, channel, and metallicity models behind the code.
+    The IMF, lifetime, channel, and metallicity models behind the code --
+    and every parameter you can change on each.
 
-    [:octicons-arrow-right-24: Physics overview](physics/index.md)
+    [:octicons-arrow-right-24: Customize overview](customize/index.md)
 
 - :material-api:{ .lg .middle } **API Reference**
 
@@ -72,5 +72,5 @@ worked scenarios.
 If CRIMSONS contributes to a publication, please consider citing the 
 presentation paper (addpaper reference here once available) and cite the
 literature sources for whichever yield tables and IMF/lifetime
-prescriptions you actually used -- see [Physics](physics/index.md) and
+prescriptions you actually used -- see [Customize](customize/index.md) and
 [Selecting Yield Models](examples/yield-models.md) for the references.

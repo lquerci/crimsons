@@ -1,5 +1,9 @@
 # Caching & Persistence
 
+Continuing from [Output Interaction](output-interaction.md): beyond
+reading a result's elements and ratios, you can also save it, reload it,
+and skip re-running a configuration you've already computed.
+
 ## Saving and loading a result directly
 
 ```python
@@ -45,7 +49,7 @@ yield tables (only `channel_names`), swapping in a different yield model
 or a hand-built `Channel` while keeping the same channel names will **not**
 change the cache key -- use separate `cache_dir`s (or `overwrite=True`) if
 you're iterating on channel internals rather than the parameters
-`RunConfig` tracks.
+`RunConfig` tracks. The same is true for the time grid: the properties of the time grid, such as the extent or the number of sterps, are not stored in the cache key and thus any change in the time grid requires rerunning the setup.  
 
 ## What gets stored in the HDF5 file
 
@@ -60,5 +64,6 @@ you're iterating on channel internals rather than the parameters
   keep cache files a reasonable size; the cumulative `enrichment` array
   already captures the yield-weighted result)
 
-Next: back to [Basic Simulation](basic-simulation.md), or dig into the
-[physics](../physics/index.md) these runs are built on.
+Next: back to [Basic Simulation](basic-simulation.md), or dig into
+[Customize](../customize/index.md) to change what these runs actually
+compute.

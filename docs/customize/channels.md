@@ -12,17 +12,15 @@ arrives, and how much of each element they release. CRIMSONS has two kinds:
 `default_channels()` returns `SNII() + AGB() + SNIa()`. Add `PISN()`
 yourself for Population III / extremely metal-poor runs.
 
-## Mass-triggered channels
+## What it is
+
+### Mass-triggered channels
 
 | Channel | Default mass window | Physical picture |
 |---|---|---|
-| `AGB` | $0.8$–$8\,M_\odot$ | Low/intermediate-mass stars enriching via stellar winds; primary $s$-process and light elements (C, N, F). |
+| `AGB` | $2$–$8\,M_\odot$ | Low/intermediate-mass stars enriching via stellar winds; primary $s$-process and light elements (C, N, F). |
 | `SNII` | $8$–$40\,M_\odot$ | Core-collapse supernovae; hydrostatic burning up to iron-group elements plus explosive nucleosynthesis. |
 | `PISN` | $140$–$260\,M_\odot$ | Pair-instability supernovae: complete disruption, no compact remnant, of very massive, metal-free/extremely metal-poor stars. Effectively Population III only. |
-
-These are constructor defaults, not physical constants -- pass
-`mass_min=`/`mass_max=` to any of the three to change the window (e.g. for
-a different progenitor model or literature convention).
 
 A star contributes to a channel if its mass falls in `[mass_min,
 mass_max]`; its delay time is simply its stellar lifetime (see
@@ -30,16 +28,14 @@ mass_max]`; its delay time is simply its stellar lifetime (see
 channel's yield table (see [Selecting Yield Models](../examples/yield-models.md)),
 evaluated at its mass and the population's metallicity.
 
-## SN Ia: a delay-time distribution over the population
+### SN Ia: a delay-time distribution over the population
 
 SN Ia doesn't select individual progenitor stars by mass -- it treats the
 whole population's eventual SN Ia rate as a population-level statistic.
-`SNIa` supports two modes:
-
-**`mode="dtd"` (default).** Explosions follow a delay-time distribution
-shape, normalized to integrate to 1 over the run's `time_grid`, then
-scaled by `rate_per_msun` (SN Ia per $M_\odot$ of stars formed) to give an
-absolute expected number of explosions per time bin:
+Explosions follow a delay-time distribution (DTD) which is normalized to
+integrate to 1 over the run's `time_grid` and is scaled by `rate_per_msun`
+(SN Ia per $M_\odot$ of stars formed) to give an absolute expected number
+of explosions per time bin:
 
 $$
 \dot N_{\rm Ia}(t) \propto \Psi(\tau)
@@ -76,18 +72,11 @@ Two shapes are available for $\Psi(\tau)$ ($\tau$ in Myr):
 Either shape's support is bounded by the progenitor mass range's
 (default $3$–$8\,M_\odot$) lifetimes: the most massive progenitor sets
 $\tau_{\min}$, the least massive sets $\tau_{\max}$, both evaluated through
-whichever `lifetime_fn` the `Simulation` uses.
-
-**`mode="single_burst"`.** The discretized limit of a delta-function DTD:
-every eligible SN Ia ($\text{rate\_per\_msun} \times \text{mass\_formed}$
-of them) explodes at one fixed delay, `burst_delay_myr`, after formation.
-`rate_per_msun` has no literature default in this mode and must be given
-explicitly.
-
-Either way, the (generally fractional) expected explosion count per time
-bin is converted to an integer count via **deterministic remainder
-carry-over** -- each bin's leftover fraction rolls into the next bin's
-expected count -- rather than a random (e.g. Poisson) draw.
+whichever `lifetime_fn` the `Simulation` uses. The (generally fractional)
+expected explosion count per time bin is converted to an integer count via
+**deterministic remainder carry-over** -- each bin's leftover fraction
+rolls into the next bin's expected count -- rather than a random (e.g.
+Poisson) draw.
 
 !!! note "SN Ia is deterministic across realizations, by default"
     Because neither the DTD shape, its normalization, nor the
@@ -101,7 +90,49 @@ expected count -- rather than a random (e.g. Poisson) draw.
     `EnrichmentResult` comes from the stochastic IMF sampling behind
     `SNII`/`AGB`/`PISN`, not from `SNIa`.
 
-## Writing your own channel
+## Customizing
+
+### Changing a channel's mass window
+
+The mass windows in the table above are constructor defaults, not
+physical constants -- pass `mass_min=`/`mass_max=` to any of the three
+mass-triggered channels to change the window (e.g. for a different
+progenitor model or literature convention):
+
+```python
+from crimsons import SNII
+
+snii = SNII(mass_min=10.0, mass_max=25.0)
+```
+
+### Choosing SN Ia's shape and mode
+
+`SNIa` supports `dtd_shape="maoz"` (default) or `dtd_shape="mannucci"`
+for the two formulas above, plus a `mode="single_burst"` alternative --
+the discretized limit of a delta-function DTD, where every eligible SN Ia
+explodes at one fixed delay (`burst_delay_myr`) after formation instead of
+following a distribution:
+
+```python
+from crimsons import SNIa
+
+snia = SNIa(dtd_shape="mannucci")
+snia = SNIa(mode="single_burst", burst_delay_myr=1000.0, rate_per_msun=0.001)
+```
+
+See [Selecting Yield Models](../examples/yield-models.md#sn-ia-delay-time-distribution-vs-single-burst)
+for the additional parameter walkthrough.
+
+### Choosing a yield model
+
+Each channel also takes `model=`/`model_params=` to select *which*
+tabulated nucleosynthesis calculation it draws yields from (independent
+of the mass window above) -- see
+[Selecting Yield Models](../examples/yield-models.md) for the full
+walkthrough, including stochastic (per-star) model parameters and
+supplying your own yield tables entirely.
+
+### Writing your own channel
 
 Subclass `MassRangeChannel` for another mass-triggered channel, or
 `Channel`/`PopulationChannel` directly for something that doesn't fit

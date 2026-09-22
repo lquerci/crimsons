@@ -61,18 +61,19 @@ nav:
   - Getting Started:
       - Installation: getting-started/installation.md
       - Quickstart: getting-started/quickstart.md
-  - Customizations:
-      - Overview: customizations/index.md
-      - Initial Mass Function: customizations/imf.md
-      - Stellar Lifetimes: customizations/lifetimes.md
-      - Enrichment Channels: customizations/channels.md
-      - Metallicity & Population III: customizations/metallicity.md
-      - Stochastic Sampling: customizations/sampling.md
   - Examples:
       - Basic Simulation: examples/basic-simulation.md
       - Custom IMF Shapes: examples/custom-imf.md
       - Selecting Yield Models: examples/yield-models.md
+      - Output Interaction: examples/output-interaction.md
       - Caching & Persistence: examples/caching-results.md
+  - Customize:
+      - Overview: customize/index.md
+      - Initial Mass Function: customize/imf.md
+      - Stellar Lifetimes: customize/lifetimes.md
+      - Enrichment Channels: customize/channels.md
+      - Metallicity & Population III: customize/metallicity.md
+      - Stochastic Sampling: customize/sampling.md
   - API Reference:
       - Overview: api/index.md
       - Simulation: api/simulation.md

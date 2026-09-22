@@ -6,7 +6,9 @@ IMF in CRIMSONS exposes a probability density `pdf(mass)` and an
 `inverse_cdf(u)` used to draw stellar masses (see
 [Stochastic Sampling](sampling.md)).
 
-## Normalization
+## What it is
+
+### Normalization
 
 CRIMSONS normalizes $\xi(m)$ as a proper *number*-density probability
 distribution over the active mass range $[m_{\min}, m_{\max}]$:
@@ -21,10 +23,9 @@ still targets a total *mass*, `mass_formed`, by drawing stars from this
 normalized distribution until their summed mass reaches the target -- see
 [Stochastic Sampling](sampling.md).)
 
-## Broken power laws
+### Broken power laws
 
-`Salpeter1955` and `Kroupa2001` are both exact special cases of
-`BrokenPowerLawIMF`: $\xi(m) \propto m^{-\alpha_k}$ on each segment
+`Salpeter1955`, `Kroupa2001`, and `FlatIMF` are  exact special cases of `BrokenPowerLawIMF`: $\xi(m) \propto m^{-\alpha_k}$ on each segment
 $[m_{k-1}, m_k)$, with amplitudes chosen so $\xi(m)$ is continuous across
 breakpoints.
 
@@ -34,14 +35,24 @@ breakpoints.
 - **Flat (`FlatIMF`):** a single segment with $\alpha = 0$, i.e.
   $\xi(m) = \text{const}$.
 
-For anything that isn't a power law, use
-[`FunctionalIMF`](../examples/custom-imf.md) instead, which builds a
-numerical inverse CDF from any shape function you supply -- this covers
-log-normal-plus-power-law forms (Chabrier-style), tapered (Larson-style)
-forms, top-heavy Population III shapes, or anything else from a paper,
-without needing a closed-form inverse.
+## Customizing
 
-## Mass range
+### Choosing a different shape
+
+The public, importable IMFs are `Salpeter1955`, `Kroupa2001`, `FlatIMF`, `Chabrier2003` and
+`FunctionalIMF`. `FlatIMF` and the `BrokenPowerLawIMF` base class are also
+available from `crimsons.imf.standard` for building your own broken power
+law by subclassing with different slopes/breakpoints.
+
+For anything that isn't a power law -- log-normal-plus-power-law forms
+(Chabrier-style), tapered (Larson-style) forms, top-heavy Population III
+shapes, or a shape lifted straight from a paper -- use `FunctionalIMF`,
+which builds a numerical inverse CDF from any shape function you supply.
+See [Custom IMF Shapes](../examples/custom-imf.md) for full worked
+examples of both routes (a custom `FunctionalIMF` shape, and subclassing
+`BrokenPowerLawIMF` directly).
+
+### Changing the mass range
 
 $[m_{\min}, m_{\max}]$ is either:
 
@@ -60,10 +71,5 @@ $[m_{\min}, m_{\max}]$ is either:
     brown-dwarf cutoff of $0.01\,M_\odot$. Pass `m_min=0.01` explicitly if
     you want that back.
 
-## Built-in vs. custom
-
-The public, importable IMFs are `Salpeter1955`, `Kroupa2001`, and
-`FunctionalIMF`. `FlatIMF` and the `BrokenPowerLawIMF` base class are also
-available from `crimsons.imf.standard` for building your own broken power
-law by subclassing with different slopes/breakpoints. See the
-[API reference](../api/imf.md) for the full parameter list of each.
+See the [API reference](../api/imf.md) for the full parameter list of
+every IMF class.

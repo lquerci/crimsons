@@ -13,14 +13,14 @@ imf = Kroupa2001()
 ```
 
 `Kroupa2001()`, `Salpeter1955()`, and `Chabrier2003()` are the built-in options. For the full 
-list of IMFs see [Initial Mass Function](../physics/imf.md). It is also possible to pass an 
+list of IMFs see [Initial Mass Function](../customize/imf.md). It is also possible to pass an 
 arbitrary custom IMF shape with `FunctionalIMF(...)`,  see
 [Custom IMF Shapes](../examples/custom-imf.md). 
 
 If the IMF is not  specified, CRIMSONS defaults to `Chabrier2003()`, with `m_ch = 0.35` or  `10` based on metallicity.
 Similarly, if no `m_min`/`m_max` is passed explicitly, the IMF resolves a metallicity-appropriate default range once
 it knows the run's metallicity (see step 2, and
-[Metallicity & Population III](../physics/metallicity.md)).
+[Metallicity & Population III](../customize/metallicity.md)).
 
 ## 2. Configure a `Simulation`
 
@@ -45,7 +45,7 @@ absolute_metallicity = z_from_logz(-1)
 
 ```
 
-The metallicity distinguishes between Pop III and Pop II single stellar populations with the threshold value set to $Z_{crit} = 10^{-4.5} Z_\odot$. Once the metallicity is specified, all parameters defaults to the fiducial parameters of Rossi et al., 2026. Additionally, if you don't pass `lifetime_fn`, CRIMSONS default is `StellarLifetime()` which uses Raitieri+97 and Schaerer 2002 for stellar lifetimes of PopII and PopIII, respectively.  Similarly, you can specify the chemical enrichment channels passing `channels` as arguments, otherwise CRIMSONS uses `default_channels()` which are: Supernovae type II (SNII), type Ia (SNIa), and Asymptiotic Giant Branch (AGB), for Pop II and PopIII, with the addition of Pair-instability SNe (PISN) for the latter.
+The metallicity distinguishes between Pop III and Pop II single stellar populations with the threshold value set to $Z_{crit} = 10^{-4.5} Z_\odot$. Once the metallicity is specified, all parameters defaults to the fiducial parameters of Rossi et al., 2026. Additionally, if you don't pass `lifetime_fn`, CRIMSONS default is `StellarLifetime()` which uses Raitieri et al.,1996 and Schaerer 2002 for stellar lifetimes of PopII and PopIII, respectively.  Similarly, you can specify the chemical enrichment channels passing `channels` as arguments, otherwise CRIMSONS uses `default_channels()` which are: Supernovae type II (SNII), type Ia (SNIa), and Asymptiotic Giant Branch (AGB), for Pop II and PopIII, with the addition of Pair-instability SNe (PISN) for the latter.
 
 ## 3. Run it
 
@@ -76,6 +76,7 @@ std = result.std()        # (n_time, n_elements) -- scatter across realizations
 Per-realization detail is also available: `result.masses`, `result.counts`
 and `result.fates` give the sampled mass bins, how many stars each bin
 represents, and which channel (or `"none"`) each bin's stars went through.
+See [Output Interactions](../examples/output-interaction.md) for detailed examples of different use cases. 
 
 ## 5. Save and reload
 
@@ -113,5 +114,6 @@ i_fe = result.elements.index("Fe")
 print("Final mean Fe returned to the ISM:", mean[-1, i_fe], "Msun")
 ```
 
-Next: [worked examples](../examples/basic-setup.md), or the
-[physics](../physics/index.md) behind each piece.
+Next: [worked examples](../examples/basic-simulation.md), or
+[Customize](../customize/index.md) for the physics and options behind
+each piece.

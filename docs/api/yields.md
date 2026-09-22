@@ -2,7 +2,7 @@
 
 Yield-table data structures, the `Channel` interface, the bundled
 SNII/AGB/PISN/SNIa channels, and HDF5/CSV table loading. See
-[Physics: Enrichment Channels](../physics/channels.md) for the underlying
+[Enrichment Channels](../customize/channels.md) for the underlying
 model and [Selecting Yield Models](../examples/yield-models.md) for usage
 examples.
 
