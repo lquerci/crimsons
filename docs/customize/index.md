@@ -58,3 +58,7 @@ CRIMSONS computes the enrichment **source term**: how much of each element
 a stellar population returns to the ISM, and when. Combining that with a
 star-formation history, gas inflows/outflows, mixing, etc. into a full
 one-zone (or multi-zone) chemical evolution model is left to the caller.
+
+## Parallelization
+
+CRIMSONS is natively parallelized and automatically adjusts the number of parallel jobs used based on the expected computational load of the simulation. It is also possible to pass the number of parallel jobs as n_jobs in the configuration phaze. The values of n_job are the maximum number of jobs. To use all the available cpus, set n_jobs to -1. The actual number of jobs used is set by the minimum between n_jobs and n_realizations.    
