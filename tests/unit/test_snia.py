@@ -16,15 +16,15 @@ H5_PATH = files("crimsons.yields") / "data" / "stellar_yields.h5"
 def test_snia_initializes_with_default_model_and_params():
     """Test the fix for the SNIa/Iwamoto default model_params bug."""
     snia = SNIa()
-    assert snia.model == "Iwamoto"
+    assert snia.model == "Iwamoto99"
     assert snia.name == "SNIa"
     # Ensure it successfully picked W7 as the default model
     assert snia._yield_table.model_params["model"] == "W7"
 
 def test_snia_initializes_with_explicit_model_params():
     """Test that explicit model parameters (like WDD2) are respected."""
-    snia = SNIa(model="Iwamoto", model_params={"model": "WDD2"})
-    assert snia.model == "Iwamoto"
+    snia = SNIa(model="Iwamoto99", model_params={"model": "WDD2"})
+    assert snia.model == "Iwamoto99"
     assert snia._yield_table.model_params["model"] == "WDD2"
 
 # --- POPULATION CHANNEL ARCHITECTURE TESTS ---
@@ -117,7 +117,7 @@ def test_describe_iwamoto_shows_mapped_metallicity():
     """Test that describe_model exposes 'metallicity' even though it's 
     not in the 'axes' attribute for SNIa/Iwamoto.
     """
-    info = describe_model(H5_PATH, "SNIa", "Iwamoto")
+    info = describe_model(H5_PATH, "SNIa", "Iwamoto99")
     
     # It should not be an independent grid axis
     assert "metallicity" not in info["axes"]
@@ -178,7 +178,7 @@ def test_snia_mapped_metallicity_shape_and_content():
     """Test that the loaded 3D matrix collapses correctly and contains
     the specific explosion energy expected from the append script.
     """
-    snia = SNIa(model="Iwamoto", model_params={"model": "W7"})
+    snia = SNIa(model="Iwamoto99", model_params={"model": "W7"})
     table = snia.yield_table()
     
     # Ensure dimensions collapsed appropriately: (1 mass, 1 metallicity, 31 elements)
