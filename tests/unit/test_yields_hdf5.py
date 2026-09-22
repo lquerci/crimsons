@@ -19,9 +19,9 @@ H5_PATH = files("crimsons.yields") / "data" / "stellar_yields.h5"
 
 
 def test_list_models_scans_channel_groups():
-    assert set(list_models(H5_PATH, "SNII")) == {"LC", "NK", "NK_HN", "HW"}
-    assert set(list_models(H5_PATH, "AGB")) == {"VAN", "MM", "NK"}
-    assert set(list_models(H5_PATH, "PISN")) == {"HW", "NK", "NK_HN"}
+    assert set(list_models(H5_PATH, "SNII")) == {"Limongi18", "Nomoto13", "Nomoto13_Hypernovae", "Heger10"}
+    assert set(list_models(H5_PATH, "AGB")) == {"VanDenHoek97", "Meynet02", "Nomoto13"}
+    assert set(list_models(H5_PATH, "PISN")) == {"Heger02", "Nomoto13", "Nomoto13_Hypernovae"}
 
 
 def test_list_models_unknown_channel_raises_with_available_listed():
@@ -30,7 +30,7 @@ def test_list_models_unknown_channel_raises_with_available_listed():
 
 
 def test_describe_model_reports_axes_and_grids():
-    info = describe_model(H5_PATH, "SNII", "LC")
+    info = describe_model(H5_PATH, "SNII", "Limongi18")
     assert info["axes"] == ["metallicity", "rotation", "mass", "elements"]
     assert info["metallicity"] == pytest.approx([1.420e-5, 1.420e-4, 1.420e-3,1.420e-2])
     assert info["rotation"] == [0.0, 150.0, 300.0]
@@ -41,7 +41,7 @@ def test_describe_model_reports_axes_and_grids():
 
 def test_plain_3d_model_loads_and_matches_grid_point_exactly():
     """NK has no extra parameters -- the simple case."""
-    table = load_yield_table_hdf5(H5_PATH, "SNII", "NK")
+    table = load_yield_table_hdf5(H5_PATH, "SNII", "Nomoto13")
     NK_mass_list = [10,11,13,15,18,20,25,30,40,100]
     NK_met_list = [1.000e-7,0.001,0.004,0.008,0.02,0.05]
     assert table.masses.tolist() == NK_mass_list
@@ -55,13 +55,13 @@ def test_plain_3d_model_loads_and_matches_grid_point_exactly():
 
 def test_model_with_one_extra_axis_requires_model_params_when_ambiguous():
     with pytest.raises(ValueError, match="rotation"):
-        load_yield_table_hdf5(H5_PATH, "SNII", "LC")
+        load_yield_table_hdf5(H5_PATH, "SNII", "Limongi18")
 
 
 def test_model_with_one_extra_axis_resolves_to_exact_slice():
     """LC has a 'rotation' axis with 3 values -- picking one should
     reproduce exactly what the generator wrote for that slice."""
-    table = load_yield_table_hdf5(H5_PATH, "SNII", "LC", model_params={"rotation": 300})
+    table = load_yield_table_hdf5(H5_PATH, "SNII", "Limongi18", model_params={"rotation": 300})
     assert table.model_params == {"rotation": 300.0}
 
     # synth_yield(mass=25, z=0.0, elem_idx=0, factor=1+300/1000=1.3)
@@ -72,8 +72,8 @@ def test_model_with_one_extra_axis_resolves_to_exact_slice():
 
 
 def test_nearest_rotation_value_is_snapped_not_interpolated():
-    exact = load_yield_table_hdf5(H5_PATH, "SNII", "LC", model_params={"rotation": 150})
-    nearby = load_yield_table_hdf5(H5_PATH, "SNII", "LC", model_params={"rotation": 200})
+    exact = load_yield_table_hdf5(H5_PATH, "SNII", "Limongi18", model_params={"rotation": 150})
+    nearby = load_yield_table_hdf5(H5_PATH, "SNII", "Limongi18", model_params={"rotation": 200})
     assert nearby.model_params["rotation"] == 150.0  # 200 is closer to 150 than to 300
     np.testing.assert_allclose(nearby.yields, exact.yields)
 
@@ -81,7 +81,7 @@ def test_nearest_rotation_value_is_snapped_not_interpolated():
 def test_model_with_two_extra_axes_resolves_to_exact_slice():
     """HW has both 'energy' and 'mixing' axes."""
     table = load_yield_table_hdf5(
-        H5_PATH, "SNII", "HW", model_params={"energy": 3, "mixing": 0.0}
+        H5_PATH, "SNII", "Heger10", model_params={"energy": 3, "mixing": 0.0}
     )
     assert table.model_params == {"energy": 3, "mixing": 0.0}
 
@@ -94,7 +94,7 @@ def test_model_with_two_extra_axes_resolves_to_exact_slice():
 
 def test_missing_one_of_two_required_params_names_the_axis():
     with pytest.raises(ValueError, match="mixing"):
-        load_yield_table_hdf5(H5_PATH, "SNII", "HW", model_params={"energy": 1.2})
+        load_yield_table_hdf5(H5_PATH, "SNII", "Heger10", model_params={"energy": 1.2})
 
 
 def test_single_metallicity_model_uses_1d_fallback():
@@ -102,7 +102,7 @@ def test_single_metallicity_model_uses_1d_fallback():
     trying to build a 2D interpolator. Querying elsewhere within the
     Population III regime should warn and clamp to that one point;
     metallicity should otherwise be irrelevant to the result."""
-    table = load_yield_table_hdf5(H5_PATH, "PISN", "HW")
+    table = load_yield_table_hdf5(H5_PATH, "PISN", "Heger02")
     assert table.metallicities.tolist() == [1e-7]
 
     y_z0 = table(mass=200.0, metallicity=1e-7)
@@ -130,13 +130,13 @@ def test_extra_axis_with_a_single_value_is_auto_selected(tmp_path):
 
 
 def test_unknown_model_raises_with_available_listed():
-    with pytest.raises(KeyError, match="NK"):
+    with pytest.raises(KeyError, match="Nomoto13"):
         load_yield_table_hdf5(H5_PATH, "SNII", "NOT_A_MODEL")
 
 
 def test_list_and_describe_available_models_convenience_wrappers():
-    assert "VAN" in list_available_models("AGB")
-    info = describe_available_model("AGB", "VAN")
+    assert "VanDenHoek97" in list_available_models("AGB")
+    info = describe_available_model("AGB", "VanDenHoek97")
     assert info["axes"] == ["metallicity", "mass", "elements"]
 
 
@@ -145,8 +145,8 @@ def test_channels_construct_with_default_and_explicit_models():
     # AGB/MM has no Population III data (see test_channels_hdf5.py's
     # dedicated population-split tests for that case)
     snii_default = SNII()  # default model is NK, needs no model_params
-    snii_rotating = SNII(model="LC", model_params={"rotation": 0})
-    agb = AGB(model="VAN")
+    snii_rotating = SNII(model="Limongi18", model_params={"rotation": 0})
+    agb = AGB(model="VanDenHoek97")
     pisn = PISN()
 
     for channel, mass, metallicity, mass_range in [
@@ -167,14 +167,14 @@ def test_snii_with_no_args_does_not_require_model_params():
     """The zero-config path (as used by default_channels()) must not
     force a rotation/energy/mixing choice on the user."""
     channel = SNII()
-    assert channel.model == "LC"
+    assert channel.model == "Limongi18"
 
 
 def test_regime_with_no_data_raises_clear_error():
     """SNII/LC's real metallicity grid ([1.42e-5 .. 1.42e-2]) has zero
     Population III coverage -- querying below the threshold must raise,
     not silently reuse Population II/I yields."""
-    table = load_yield_table_hdf5(H5_PATH, "SNII", "LC", model_params={"rotation": 0})
+    table = load_yield_table_hdf5(H5_PATH, "SNII", "Limongi18", model_params={"rotation": 0})
     with pytest.raises(ValueError, match="Population III"):
         table(mass=25.0, metallicity=1e-8)
 
@@ -182,7 +182,7 @@ def test_regime_with_no_data_raises_clear_error():
 def test_regime_missing_the_other_direction():
     """AGB/MM's real grid is Population III only (Z=1e-7) -- querying at
     a normal metallicity must raise, not silently reuse PopIII yields."""
-    table = load_yield_table_hdf5(H5_PATH, "AGB", "MM")
+    table = load_yield_table_hdf5(H5_PATH, "AGB", "Meynet02")
     with pytest.raises(ValueError, match="Population II/I"):
         table(mass=3.0, metallicity=ZSUN)
 
@@ -195,7 +195,7 @@ def test_regime_split_never_blends_across_the_threshold():
     smooth curve straddling both."""
     import warnings as _warnings
 
-    table = load_yield_table_hdf5(H5_PATH, "SNII", "NK")
+    table = load_yield_table_hdf5(H5_PATH, "SNII", "Nomoto13")
     # NK's grid: Z = [1e-7 (PopIII), 0.001, 0.004, 0.008, 0.02, 0.05 (PopII/I)]
     with _warnings.catch_warnings():
         _warnings.simplefilter("ignore", MetallicityOutOfRangeWarning)

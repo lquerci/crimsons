@@ -194,7 +194,7 @@ class TestParallelMatchesSerial:
 class TestPicklabilityGuard:
     def test_lambda_based_model_params_fails_fast_with_a_clear_error(self):
         bad_snii = SNII(
-            model="HW",
+            model="Heger10",
             model_params={"energy": lambda rng, n: rng.uniform(1, 10, n), "mixing": 63.1},
             metallicity=1e-7,
         )
@@ -212,7 +212,7 @@ class TestPicklabilityGuard:
         # the same unpicklable channel must still work fine at n_jobs=1
         # -- the picklability requirement is specific to parallel execution
         bad_snii = SNII(
-            model="HW",
+            model="Heger10",
             model_params={"energy": lambda rng, n: rng.uniform(1, 10, n), "mixing": 63.1},
             metallicity=1e-7,
         )

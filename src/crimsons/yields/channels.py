@@ -59,24 +59,24 @@ def _hw_mixing_distribution(rng, n):
 _REGIME_DEFAULTS = {
     "SNII": {
         "Population III": (
-            "HW",
+            "Heger10",
             {"energy": _hw_energy_distribution, "mixing": _hw_mixing_distribution},
         ),
-        "Population II/I": ("LC", {"rotation": 0}),
+        "Population II/I": ("Limongi18", {"rotation": 0}),
     },
     "AGB": {
-        "Population III": ("MM", {}),
-        "Population II/I": ("VAN", {}),
+        "Population III": ("Meynet02", {}),
+        "Population II/I": ("VanDenHoek97", {}),
     },
     "PISN": {
         # PISN is physically a Population III / extremely metal-poor
         # phenomenon either way -- HW is used regardless of regime.
-        "Population III": ("HW", {}),
-        "Population II/I": ("HW", {}),
+        "Population III": ("Heger02", {}),
+        "Population II/I": ("Heger02", {}),
     },
     "SNIa": {
-        "Population III": ("Iwamoto", {"model": "W70"}),
-        "Population II/I": ("Iwamoto", {"model": "W7"}),
+        "Population III": ("Iwamoto99", {"model": "W70"}),
+        "Population II/I": ("Iwamoto99", {"model": "W7"}),
     },
 }
 
@@ -161,7 +161,7 @@ class AGB(MassRangeChannel):
 
     def __init__(
         self,
-        mass_min: float = 0.8,
+        mass_min: float = 2.0,
         mass_max: float = 8.0,
         model: str | None = None,
         model_params: dict | None = None,
@@ -266,8 +266,8 @@ class SNIa(PopulationChannel):
     (flag_SNIa_mode):
 
     mode="dtd" (default): explosions follow a delay-time distribution
-        SHAPE (dtd_shape="mannucci" (Mannucci+06/Matteucci+06, default)
-        or "maoz" (Maoz+12)), normalized to integrate to 1 over the
+        SHAPE (dtd_shape="mannucci" (Mannucci+06/Matteucci+06)
+        or "maoz" (Maoz+12, default)), normalized to integrate to 1 over the
         run's time_grid, then scaled by rate_per_msun (SNIa per Msun of
         stars formed -- defaults to the literature value for the chosen
         shape: 0.0025 for mannucci, 0.0013 for maoz) to get an absolute
