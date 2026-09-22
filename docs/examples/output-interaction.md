@@ -169,6 +169,12 @@ default (e.g. to compare two solar references side by side).
 "[C/Xx]" in result     # False
 ```
 
+## Explosion energy
+
+Some enrichment channels are related to explosive phases of the stellar lifetime. It is possible to access the cumulative energy ejected by the explosion events with `result['explosion_energy']` computed in erg. The estimated explosion energy for `SNIa` is $1.2  \times 10^{51}$ erg. For `SNII` depends on the stellar population with popII/I explosions energy being $1  \times 10^{51}$ erg, while varying based on the model for PopIII. Similarly, `PISN` explosion energy depends on the model selected. The `AGB` stars do not contribute to the cumulative explosion energy. 
+
+Note that the explosion energy can be also computed from the individual fates of the stellar partilces.  
+
 ## Next
 
 - [Caching & Persistence](caching-results.md) -- `result.save()`/`.load()`,
