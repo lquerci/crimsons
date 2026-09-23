@@ -9,8 +9,7 @@ Welcome to the CRIMSONS documentation!
 
 
 !!! warning "Current status: under development"
-    This Python package is currently under development. 
-    You can already read the documentation and try install it from source, but please bear in mind that things might be unstable and untested. A more stable version of CRIMSONS can be found as web-based version of the [CRIMSONS tool](https://martina-rossi.it/crimsons.html){: target="_blank" }. Thanks for your patience. 
+    This Python package is currently under development and things might be unstable and untested. A more stable version of CRIMSONS can be found as web-based version of the [CRIMSONS tool](https://martina-rossi.it/crimsons.html){: target="_blank" }. Thanks for your patience. 
 
 
 CRIMSONS is a tool for modelling the chemical enrichment and energy feedback from a single stellar population of Population III or Population II/I stars. It performs a stochastic sampling of the Initial Mass Function (IMF) and evolves the individual stars with four chemical enrichment channels: Supernovae type II (SNII) and Ia (SNIa), Asymptotic Giant Branch (AGB), and pair instability supernovae (PISN). The tool is distributed in two forms: an online tool version  that can be found at [CRIMSONS tool](https://martina-rossi.it/crimsons.html){: target="_blank" } and a Python package. This is the documentation page for the Python package.
@@ -70,8 +69,19 @@ worked scenarios.
 
 ## Citing
 
-If CRIMSONS contributes to a publication, please consider citing the 
-presentation paper (addpaper reference here once available) and cite the
-literature sources for whichever yield tables and IMF/lifetime
-prescriptions you actually used -- see [Customize](customize/index.md) and
-[Selecting Yield Models](examples/yield-models.md) for the references.
+If CRIMSONS contributes to a publication, please cite  the literature sources for whichever yield tables and IMF/lifetime prescriptions you actually used and  consider citing the 
+presentation paper 
+> Rossi, M., et al. (2026). *CRIMSONS: An Online Tool for Modeling Chemical Enrichment with Stochastic IMF Sampling*. arXiv preprint [arXiv:2609.25200](https://arxiv.org/abs/2609.25200).
+
+**BibTeX:**
+```bibtex
+@misc{rossi2026crimsonsonlinetoolmodeling,
+      title={CRIMSONS: An Online Tool for Modeling Chemical Enrichment with Stochastic IMF Sampling}, 
+      author={Martina Rossi and Lapo Querci and Stefano Ciabattini and Stefania Salvadori and Irene Vanni and Davide Massari and Edoardo Ceccarelli and Donatella Romano and Viola Gelli and Raffaele Pascale and Alice Mori and Elka Rusta and Ioanna Koutsouridou and Ása Skúladóttir and Laura Magrini and Riano Giribaldi and Jose Schiappacasse-Ulloa},
+      year={2026},
+      eprint={2609.25200},
+      archivePrefix={arXiv},
+      primaryClass={astro-ph.GA},
+      url={[https://arxiv.org/abs/2609.25200](https://arxiv.org/abs/2609.25200)}, 
+}
+```
