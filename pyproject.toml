@@ -32,6 +32,9 @@ docs = [
     "mkdocs>=1.5",
     "mkdocs-material>=9.5",
     "mkdocstrings[python]>=0.24",
+    "mkdocs-git-revision-date-localized-plugin>=1.2",
+    "pymdown-extensions>=10.9",
+
 ]
 
 [project.urls]
@@ -40,6 +43,25 @@ Issues = "https://github.com/lquerci/crimsons/issues"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/crimsons"]
+
+# Belt-and-suspenders alongside `packages` above: force-include/artifacts
+# are explicitly documented as NOT subject to .gitignore filtering, unlike
+# every other file-selection option (including `packages`/`only-include`).
+# If a broad .gitignore rule (e.g. "*.h5" or "data/") ever catches these,
+# these entries keep the yield tables and solar-abundance data shipping
+# regardless. Safe to remove once you've verified (see the check below)
+# that plain `packages` already covers it on its own.
+[tool.hatch.build.targets.wheel.force-include]
+"src/crimsons/yields/data" = "crimsons/yields/data"
+"src/crimsons/yields/manifest.yaml" = "crimsons/yields/manifest.yaml"
+"src/crimsons/data" = "crimsons/data"
+
+[tool.hatch.build.targets.sdist]
+artifacts = [
+    "src/crimsons/yields/data/*",
+    "src/crimsons/yields/manifest.yaml",
+    "src/crimsons/data/*",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
