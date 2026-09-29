@@ -19,9 +19,9 @@ H5_PATH = files("crimsons.yields") / "data" / "stellar_yields.h5"
 
 
 def test_list_models_scans_channel_groups():
-    assert set(list_models(H5_PATH, "SNII")) == {"Limongi18", "Nomoto13", "Nomoto13_Hypernovae", "Heger10"}
-    assert set(list_models(H5_PATH, "AGB")) == {"VanDenHoek97", "Meynet02", "Nomoto13"}
-    assert set(list_models(H5_PATH, "PISN")) == {"Heger02", "Nomoto13", "Nomoto13_Hypernovae"}
+    assert set(list_models(H5_PATH, "SNII")) == {"Limongi18", "Nomoto13_PopIII", "Nomoto13_Hypernovae_PopIII", "Heger10", "Nomoto13_PopII", "Nomoto13_Hypernovae_PopII", "Iwamoto05"}
+    assert set(list_models(H5_PATH, "AGB")) == {"VanDenHoek97", "Meynet02", "Nomoto13_PopIII", "Nomoto13_PopII"}
+    assert set(list_models(H5_PATH, "PISN")) == {"Heger02", "Nomoto13_PopIII", "Nomoto13_Hypernovae_PopIII"}
 
 
 def test_list_models_unknown_channel_raises_with_available_listed():
@@ -40,10 +40,11 @@ def test_describe_model_reports_axes_and_grids():
 
 
 def test_plain_3d_model_loads_and_matches_grid_point_exactly():
-    """NK has no extra parameters -- the simple case."""
-    table = load_yield_table_hdf5(H5_PATH, "SNII", "Nomoto13")
-    NK_mass_list = [10,11,13,15,18,20,25,30,40,100]
-    NK_met_list = [1.000e-7,0.001,0.004,0.008,0.02,0.05]
+    """NK has no extra parameters -- the simple case.
+        Test both PopIII and PopII"""
+    table = load_yield_table_hdf5(H5_PATH, "SNII", "Nomoto13_PopIII")
+    NK_mass_list = [11,13,15,18,20,25,30,40,100]
+    NK_met_list = [1.000e-7]
     assert table.masses.tolist() == NK_mass_list
     assert table.metallicities.tolist() == NK_met_list
 
@@ -51,6 +52,19 @@ def test_plain_3d_model_loads_and_matches_grid_point_exactly():
     y = table(mass=20.0, metallicity=1e-7)
     H_index = HDF_COLUMNS.index('H')
     assert y[0, H_index] == pytest.approx(8.7742)
+
+    table = load_yield_table_hdf5(H5_PATH, "SNII", "Nomoto13_PopII")
+    NK_mass_list = [13,15,18,20,25,30,40]
+    NK_met_list = [0.001,0.004,0.008,0.02,0.05]
+    assert table.masses.tolist() == NK_mass_list
+    assert table.metallicities.tolist() == NK_met_list
+
+    y = table(mass=20.0, metallicity=1e-7)
+    H_index = HDF_COLUMNS.index('H')
+    assert y[0, H_index] == pytest.approx(8.434)
+
+
+
 
 
 def test_model_with_one_extra_axis_requires_model_params_when_ambiguous():
@@ -130,7 +144,7 @@ def test_extra_axis_with_a_single_value_is_auto_selected(tmp_path):
 
 
 def test_unknown_model_raises_with_available_listed():
-    with pytest.raises(KeyError, match="Nomoto13"):
+    with pytest.raises(KeyError, match="Nomoto13_PopIII"):
         load_yield_table_hdf5(H5_PATH, "SNII", "NOT_A_MODEL")
 
 
@@ -185,25 +199,3 @@ def test_regime_missing_the_other_direction():
     table = load_yield_table_hdf5(H5_PATH, "AGB", "Meynet02")
     with pytest.raises(ValueError, match="Population II/I"):
         table(mass=3.0, metallicity=ZSUN)
-
-
-def test_regime_split_never_blends_across_the_threshold():
-    """A model with coverage on both sides (SNII/NK) must not produce a
-    value that's some blend of its lowest PopIII point and its lowest
-    PopII/I point -- querying just above vs just below the threshold
-    should land on two independently-interpolated regimes, not one
-    smooth curve straddling both."""
-    import warnings as _warnings
-
-    table = load_yield_table_hdf5(H5_PATH, "SNII", "Nomoto13")
-    # NK's grid: Z = [1e-7 (PopIII), 0.001, 0.004, 0.008, 0.02, 0.05 (PopII/I)]
-    with _warnings.catch_warnings():
-        _warnings.simplefilter("ignore", MetallicityOutOfRangeWarning)
-        just_below = table(mass=20.0, metallicity=2.9e-7)  # PopIII -> clamps to 1e-7
-        just_above = table(mass=20.0, metallicity=3.1e-7)  # PopII/I -> clamps to its lowest point, 0.001
-        at_popIII_point = table(mass=20.0, metallicity=1e-7)
-        at_lowest_popII_point = table(mass=20.0, metallicity=0.001)
-
-    np.testing.assert_allclose(just_below, at_popIII_point)
-    np.testing.assert_allclose(just_above, at_lowest_popII_point)
-    assert not np.allclose(just_below, just_above)
