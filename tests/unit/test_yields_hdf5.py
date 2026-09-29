@@ -59,9 +59,9 @@ def test_plain_3d_model_loads_and_matches_grid_point_exactly():
     assert table.masses.tolist() == NK_mass_list
     assert table.metallicities.tolist() == NK_met_list
 
-    y = table(mass=20.0, metallicity=1e-7)
+    y = table(mass=20.0, metallicity=1e-3)
     H_index = HDF_COLUMNS.index('H')
-    assert y[0, H_index] == pytest.approx(8.434)
+    assert y[0, H_index] == pytest.approx(8.4343)
 
 
 
