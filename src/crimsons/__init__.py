@@ -1,4 +1,5 @@
-from importlib.metadata import PackageNotFoundError, version # automatic version number
+from importlib.metadata import PackageNotFoundError, version  # automatic version number
+
 from .chemistry import (
     ELEMENTS,
     ZSUN,
