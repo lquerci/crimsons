@@ -19,7 +19,7 @@ H5_PATH = files("crimsons.yields") / "data" / "stellar_yields.h5"
 
 
 def test_list_models_scans_channel_groups():
-    assert set(list_models(H5_PATH, "SNII")) == {"Limongi18", "Nomoto13_PopIII", "Nomoto13_Hypernovae_PopIII", "Heger10", "Nomoto13_PopII", "Nomoto13_Hypernovae_PopII", "Iwamoto05"}
+    assert set(list_models(H5_PATH, "SNII")) == {"Limongi18", "Nomoto13_PopIII", "Nomoto13_Hypernovae_PopIII", "Heger10", "Nomoto13_PopII", "Nomoto13_Hypernovae_PopII", "Iwamoto05", "Woosley95"}
     assert set(list_models(H5_PATH, "AGB")) == {"VanDenHoek97", "Meynet02", "Nomoto13_PopIII", "Nomoto13_PopII"}
     assert set(list_models(H5_PATH, "PISN")) == {"Heger02", "Nomoto13_PopIII", "Nomoto13_Hypernovae_PopIII"}
 
