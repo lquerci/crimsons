@@ -3,6 +3,7 @@ name: CI
 on:
   push:
     branches: [main]
+    tags: ['v*.*.*']  # Triggers when you push a tag like v0.1.1
   pull_request:
 
 jobs:
@@ -22,12 +23,14 @@ jobs:
       - run: ruff check src tests
 
   publish:
-    name: Publish to PyPI
+    name: Publish to PyPI & GitHub Release
     needs: test
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    # Only publish when a version tag (v*) is pushed
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
-      id-token: write  # Required for Trusted Publishing authentication
+      id-token: write     # For PyPI Trusted Publishing
+      contents: write     # For creating GitHub Releases
     steps:
       - uses: actions/checkout@v4
 
@@ -42,4 +45,10 @@ jobs:
         run: python -m build
 
       - name: Publish to PyPI
-        uses: pypa/gh-action-pypa-publish@release/v1
+        uses: pypa/gh-action-pypi-publish@release/v1
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true
