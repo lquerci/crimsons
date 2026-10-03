@@ -4,6 +4,15 @@ All notable changes to CRIMSONS are documented here, following the spirit
 of [Keep a Changelog](https://keepachangelog.com/en/1.1.0/){: target="_blank" } and
 [Semantic Versioning](https://semver.org/){: target="_blank" }.
 
+## [0.1.1] - 2026-10-03
+
+### Added
+- Woosley and Wever 1995 yields
+ 
+### Fixed
+- Yields and explosion energy of Heger02 yields for PISN 
+- interpolation error for Nomoto13 yields
+
 ## [0.1.0]
 
 Initial development release.
