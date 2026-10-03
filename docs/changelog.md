@@ -4,10 +4,11 @@ All notable changes to CRIMSONS are documented here, following the spirit
 of [Keep a Changelog](https://keepachangelog.com/en/1.1.0/){: target="_blank" } and
 [Semantic Versioning](https://semver.org/){: target="_blank" }.
 
-## [0.1.1] - 2026-10-03
+## [0.1.2] - 2026-10-03
 
 ### Added
 - Woosley and Wever 1995 yields
+- Iwamoto 2005 yields
  
 ### Fixed
 - Yields and explosion energy of Heger02 yields for PISN 
@@ -26,4 +27,4 @@ Initial development release.
 - Result caching keyed on a hashed `RunConfig`.
 
 [Unreleased]: https://github.com/your-org/crimsons/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/your-org/crimsons/releases/tag/v0.1.0
+[0.1.2]: https://github.com/your-org/crimsons/releases/tag/v0.1.2
