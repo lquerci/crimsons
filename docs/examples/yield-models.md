@@ -37,7 +37,7 @@ describe_available_model("SNII", "Limongi18")
 
 Every model has `metallicity`, `mass`, and `elements` axes. Any *other*
 axis (like `Limongi18`'s `rotation`, or `Heager10`'s `energy`/`mixing`) is a discrete
-model parameter you resolve via `model_params` (see [Extra axes](yield-models.md#picking-a-model-with-extra-axes)) 
+model parameter you resolve via `model_params` (see [Extra axes](yield-models.md#picking-a-model-with-extra-axes)). For a complete list of yields sets, their properties, the reference see [Yield Sets](../customize/yield_sets.md).  
 
 
 ## Extra axis

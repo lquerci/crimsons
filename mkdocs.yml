@@ -72,6 +72,7 @@ nav:
       - Initial Mass Function: customize/imf.md
       - Stellar Lifetimes: customize/lifetimes.md
       - Enrichment Channels: customize/channels.md
+      - Yield Sets: customize/yield-sets.md
       - Metallicity & Population III: customize/metallicity.md
       - Stochastic Sampling: customize/sampling.md
   - API Reference:

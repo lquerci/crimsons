@@ -41,6 +41,7 @@ channels with stochastic model parameters, from those draws too).
   when, and with how much of each element; change a channel's mass
   window, pick a different SN Ia delay-time distribution, or write a new
   channel from scratch.
+- **[Yield sets](yield-sets.md)**: lists the ready to use set of yields as well as their properties and reference.
 - **[Metallicity & Population III](metallicity.md)**: how the
   metallicity threshold reshapes the IMF's default mass range, the
   lifetime formula, and which yield tables apply, and how to override each of those independently.
