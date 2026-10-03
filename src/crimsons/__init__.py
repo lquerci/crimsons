@@ -1,3 +1,4 @@
+from importlib.metadata import PackageNotFoundError, version # automatic version number
 from .chemistry import (
     ELEMENTS,
     ZSUN,
@@ -47,4 +48,9 @@ __all__ = [
     "z_from_logz",
 ]
 
-__version__ = "0.1.0"
+# automatic version update
+try:
+    __version__ = version("crimsons")
+except PackageNotFoundError:
+    # Package is not installed (e.g. running directly from source without pip install -e .)
+    __version__ = "unknown"
